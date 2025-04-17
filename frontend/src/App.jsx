@@ -8,7 +8,8 @@ import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import AddExpensePage from './pages/AddExpensePage';
-import GroupsPage from './pages/GroupsPage'; // GroupsPage is already imported
+import GroupsPage from './pages/GroupsPage';
+import GroupDetailPage from './pages/GroupDetailPage';
 
 // Import Auth context and ProtectedRoute component
 import { useAuth } from './context/AuthContext';
@@ -88,7 +89,16 @@ function App() {
              </ProtectedRoute>
            }
          />
-
+         
+         {/* Group Detail Page Route */}
+         <Route
+           path="/groups/:groupId" // Path for individual group details
+           element={
+             <ProtectedRoute>
+               <GroupDetailPage />
+             </ProtectedRoute>
+           }
+         />
 
 
         {/* --- Public Routes --- */}

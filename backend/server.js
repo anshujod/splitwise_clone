@@ -96,6 +96,40 @@ const errorHandler = (err, req, res, next) => {
 // ROUTES
 // ==========================================
 
+// --- Payments API ---
+app.post('/api/payments', authenticateToken, async (req, res) => {
+  try {
+    const { payeeId, payerId, amount, groupId } = req.body;
+    
+    // Validate input
+    if (!payeeId || !payerId || !amount || amount <= 0) {
+      return res.status(400).json({ message: 'Invalid payment data' });
+    }
+    if (payeeId === payerId) {
+      return res.status(400).json({ message: 'Cannot make payment to yourself' });
+    }
+
+    // Create payment record
+    const payment = await prisma.payment.create({
+      data: {
+        amount,
+        payer: { connect: { id: payerId } },
+        payee: { connect: { id: payeeId } },
+        ...(groupId && { group: { connect: { id: groupId } } })
+      },
+      include: {
+        payer: { select: { id: true, username: true } },
+        payee: { select: { id: true, username: true } }
+      }
+    });
+
+    res.status(201).json(payment);
+  } catch (error) {
+    console.error('Payment creation error:', error);
+    res.status(500).json({ message: 'Failed to record payment' });
+  }
+});
+
 // --- Simple Base Route ---
 app.get('/', (req, res) => {
   res.send('Hello from the Splitwise Clone Backend!');
@@ -260,13 +294,13 @@ app.get('/api/expenses', authenticateToken, async (req, res) => {
 // CREATE EXPENSE ROUTE
 app.post('/api/expenses', authenticateToken, async (req, res) => {
   const loggedInUserId = req.user.userId;
-  const { description, amount, groupId } = req.body;
+  const { description, amount, groupId, splits } = req.body;
 
   console.log(`Attempting to add expense by user ${loggedInUserId} for group ${groupId}:`, req.body);
 
   // Input Validation
-  if (!description || !amount || !groupId) {
-    return res.status(400).json({ message: 'Missing required fields (description, amount, groupId)' });
+  if (!description || !amount || !groupId || !splits) {
+    return res.status(400).json({ message: 'Missing required fields (description, amount, groupId, splits)' });
   }
   
   const numericAmount = parseFloat(amount);
@@ -274,13 +308,38 @@ app.post('/api/expenses', authenticateToken, async (req, res) => {
     return res.status(400).json({ message: 'Invalid amount provided' });
   }
 
+  // Validate splits array
+  if (!splits) {
+    return res.status(400).json({ message: 'Splits array is required.' });
+  }
+  if (!Array.isArray(splits) || splits.length === 0) {
+    return res.status(400).json({ message: 'Splits must be a non-empty array' });
+  }
+
+  // Validate each split
+  for (const split of splits) {
+    if (!split.userId || typeof split.amountOwed !== 'number') {
+      return res.status(400).json({ message: 'Each split must have userId and amountOwed' });
+    }
+    if (split.amountOwed < 0) {
+      return res.status(400).json({ message: 'Split amounts must be non-negative' });
+    }
+  }
+
+  // Verify splits sum equals expense amount
+  const splitsSum = splits.reduce((sum, split) => sum + parseFloat(split.amountOwed), 0);
+  if (Math.abs(splitsSum - numericAmount) > 0.01) {
+    return res.status(400).json({
+      message: `Sum of splits ($${splitsSum.toFixed(2)}) does not match expense amount ($${numericAmount.toFixed(2)})`
+    });
+  }
+
   try {
     // Use a transaction to ensure atomicity
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Verify group exists and user is a member, fetch all members for splitting
+      // 1. Verify group exists and user is a member
       const groupMembership = await tx.groupMember.findUnique({
-        where: { groupId_userId: { groupId: groupId, userId: loggedInUserId } },
-        include: { group: { include: { members: { select: { userId: true } } } } }
+        where: { groupId_userId: { groupId: groupId, userId: loggedInUserId } }
       });
 
       if (!groupMembership) {
@@ -293,36 +352,25 @@ app.post('/api/expenses', authenticateToken, async (req, res) => {
           description: description,
           amount: numericAmount,
           groupId: groupId,
-          paidById: loggedInUserId, // Payer is the user making the request
+          paidById: loggedInUserId,
         }
       });
 
-      // 3. Calculate Equal Split
-      const members = groupMembership.group.members;
-      const numberOfMembers = members.length;
-      if (numberOfMembers === 0) {
-        throw new Error('Cannot split expense in a group with no members.');
-      }
-      
-      // Round to cents
-      const amountPerMember = Math.round((numericAmount / numberOfMembers) * 100) / 100;
-      console.log(`Splitting $${numericAmount} among ${numberOfMembers} members. Share: $${amountPerMember}`);
+      // 3. Create ExpenseSplit records from provided splits
+      await Promise.all(
+        splits.map(split =>
+          tx.expenseSplit.create({
+            data: {
+              expenseId: newExpense.id,
+              userId: split.userId,
+              amountOwed: parseFloat(split.amountOwed),
+            }
+          })
+        )
+      );
 
-      // 4. Create ExpenseSplit record for each member
-      const splitPromises = members.map(member => {
-        return tx.expenseSplit.create({
-          data: {
-            expenseId: newExpense.id,
-            userId: member.userId,
-            amountOwed: amountPerMember,
-          }
-        });
-      });
-      
-      await Promise.all(splitPromises); // Wait for all splits to be created
-
-      console.log(`Expense ${newExpense.id} created and split among ${numberOfMembers} members.`);
-      return newExpense; // Return the created expense
+      console.log(`Expense ${newExpense.id} created with ${splits.length} custom splits`);
+      return newExpense;
     }); // End transaction
 
     // Transaction Successful
@@ -349,11 +397,29 @@ app.get('/api/groups', authenticateToken, async (req, res) => {
   try {
     const memberships = await prisma.groupMember.findMany({
       where: { userId: loggedInUserId },
-      include: { group: true },
+      include: {
+        group: {
+          include: {
+            members: {
+              select: {
+                user: {
+                  select: {
+                    id: true,
+                    username: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       orderBy: { group: { name: 'asc' } }
     });
     
-    const groups = memberships.map(membership => membership.group);
+    const groups = memberships.map(membership => ({
+      ...membership.group,
+      members: membership.group.members
+    }));
     res.status(200).json(groups);
   } catch (error) {
     console.error("Error fetching user groups:", error);
@@ -403,6 +469,69 @@ app.post('/api/groups', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error("Error creating group:", error);
     res.status(500).json({ message: 'Internal server error while creating group.' });
+  }
+});
+
+// ADD MEMBER TO GROUP ROUTE
+app.post('/api/groups/:groupId/members', authenticateToken, async (req, res) => {
+  const { groupId } = req.params;
+  const loggedInUserId = req.user.userId;
+  const { email } = req.body;
+
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return res.status(400).json({ message: 'Valid email is required' });
+  }
+
+  try {
+    // Verify requesting user is a group member
+    const requesterMembership = await prisma.groupMember.findUnique({
+      where: {
+        groupId_userId: {
+          groupId,
+          userId: loggedInUserId
+        }
+      }
+    });
+
+    if (!requesterMembership) {
+      return res.status(403).json({ message: 'You must be a group member to add others' });
+    }
+
+    // Find user by email
+    const userToAdd = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!userToAdd) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if user is already in group
+    const existingMembership = await prisma.groupMember.findUnique({
+      where: {
+        groupId_userId: {
+          groupId,
+          userId: userToAdd.id
+        }
+      }
+    });
+
+    if (existingMembership) {
+      return res.status(409).json({ message: 'User is already in this group' });
+    }
+
+    // Add user to group
+    await prisma.groupMember.create({
+      data: {
+        groupId,
+        userId: userToAdd.id
+      }
+    });
+
+    res.status(201).json({ message: 'Member added successfully' });
+  } catch (error) {
+    console.error('Error adding member:', error);
+    res.status(500).json({ message: 'Failed to add member' });
   }
 });
 
@@ -457,6 +586,57 @@ app.get('/api/groups/:groupId', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error(`Error fetching group ${groupId} details:`, error);
     res.status(500).json({ message: 'Error fetching group details' });
+  }
+});
+
+// PAYMENT ROUTES
+app.post('/api/payments', authenticateToken, async (req, res) => {
+  try {
+    const { payeeId, amount, groupId } = req.body;
+    const payerId = req.user.userId;
+
+    // Validate input
+    if (!payeeId || !amount) {
+      return res.status(400).json({ message: 'Payee ID and amount are required' });
+    }
+    if (payeeId === payerId) {
+      return res.status(400).json({ message: 'Cannot make payment to yourself' });
+    }
+    if (isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ message: 'Amount must be a positive number' });
+    }
+
+    // Verify payee exists
+    const payee = await prisma.user.findUnique({ where: { id: payeeId } });
+    if (!payee) {
+      return res.status(404).json({ message: 'Payee not found' });
+    }
+
+    // Optional: Verify both users are in group if groupId provided
+    if (groupId) {
+      const [payerInGroup, payeeInGroup] = await Promise.all([
+        prisma.groupMember.findFirst({ where: { groupId, userId: payerId } }),
+        prisma.groupMember.findFirst({ where: { groupId, userId: payeeId } })
+      ]);
+      if (!payerInGroup || !payeeInGroup) {
+        return res.status(400).json({ message: 'Both users must be group members' });
+      }
+    }
+
+    // Create payment record
+    const payment = await prisma.payment.create({
+      data: {
+        amount,
+        payer: { connect: { id: payerId } },
+        payee: { connect: { id: payeeId } },
+        ...(groupId && { group: { connect: { id: groupId } } })
+      }
+    });
+
+    res.status(201).json(payment);
+  } catch (error) {
+    console.error('Payment error:', error);
+    res.status(500).json({ message: 'Failed to record payment' });
   }
 });
 
@@ -552,28 +732,47 @@ app.get('/api/balance/overall', authenticateToken, async (req, res) => {
   console.log(`Calculating overall balance for user ID: ${loggedInUserId}`);
 
   try {
-    // 1. Calculate Total Amount User Paid for Expenses
-    const totalPaidResult = await prisma.expense.aggregate({
-      _sum: { amount: true },
-      where: { paidById: loggedInUserId }
-    });
-    
-    const totalPaid = totalPaidResult._sum.amount || 0; // Default to 0 if null
+    // Get all balance data in parallel
+    const [
+      totalPaidResult,
+      totalOwedResult,
+      paymentsMadeResult,
+      paymentsReceivedResult
+    ] = await Promise.all([
+      prisma.expense.aggregate({
+        _sum: { amount: true },
+        where: { paidById: loggedInUserId }
+      }),
+      prisma.expenseSplit.aggregate({
+        _sum: { amountOwed: true },
+        where: { userId: loggedInUserId }
+      }),
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { payerId: loggedInUserId }
+      }),
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { payeeId: loggedInUserId }
+      })
+    ]);
 
-    // 2. Calculate Total Amount User Owes from Splits
-    const totalOwedResult = await prisma.expenseSplit.aggregate({
-      _sum: { amountOwed: true },
-      where: { userId: loggedInUserId }
-    });
-    
-    const totalOwed = totalOwedResult._sum.amountOwed || 0; // Default to 0 if null
+    const totalPaid = totalPaidResult._sum.amount || 0;
+    const totalOwed = totalOwedResult._sum.amountOwed || 0;
+    const totalPaymentsMade = paymentsMadeResult._sum.amount || 0;
+    const totalPaymentsReceived = paymentsReceivedResult._sum.amount || 0;
 
-    // 3. Calculate Net Balance
-    // Positive: User is owed money (paid more than their share)
-    // Negative: User owes money (their share is more than they paid)
-    const netBalance = totalPaid - totalOwed;
+    // Calculate Net Balance including payments
+    // Payments received increase your effective balance
+    // Payments made decrease your effective balance
+    const netBalance = (totalPaid + totalPaymentsReceived) - (totalOwed + totalPaymentsMade);
 
-    console.log(`User ${loggedInUserId}: Total Paid = ${totalPaid}, Total Owed = ${totalOwed}, Net Balance = ${netBalance}`);
+    console.log(`User ${loggedInUserId}:
+      Total Paid = ${totalPaid},
+      Total Owed = ${totalOwed},
+      Payments Made = ${totalPaymentsMade},
+      Payments Received = ${totalPaymentsReceived},
+      Net Balance = ${netBalance}`);
 
     // Respond with the calculated values
     res.status(200).json({

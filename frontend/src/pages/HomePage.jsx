@@ -1,186 +1,255 @@
-// frontend/src/pages/HomePage.jsx
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom'; // For navigation link/button
-import { useAuth } from '../context/AuthContext'; // To get user info and token
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import RecordPaymentModal from '../components/RecordPaymentModal';
 
 function HomePage() {
-  // State for the list of user's expense splits
-  const [expenses, setExpenses] = useState([]);
-  const [loadingExpenses, setLoadingExpenses] = useState(true);
-  const [errorExpenses, setErrorExpenses] = useState('');
-
-  // State for the user's overall balance summary
-  const [balance, setBalance] = useState({ totalPaid: 0, totalOwed: 0, netBalance: 0 });
-  const [loadingBalance, setLoadingBalance] = useState(true);
-  const [errorBalance, setErrorBalance] = useState('');
-
-  // --- NEW: State for Detailed Balances (per person) ---
-  const [detailedBalances, setDetailedBalances] = useState([]); // Array to hold balances with others
-  const [loadingDetailed, setLoadingDetailed] = useState(true); // Loading status for detailed balances
-  const [errorDetailed, setErrorDetailed] = useState('');     // Error status for detailed balances
-  // --- End New State ---
-
-  // Get authentication token and user details from context
+  // State management
   const { token, user } = useAuth();
+  
+  // Data states
+  const [expenses, setExpenses] = useState([]);
+  const [balance, setBalance] = useState({ totalPaid: 0, totalOwed: 0, netBalance: 0 });
+  const [detailedBalances, setDetailedBalances] = useState([]);
+  
+  // Loading states
+  const [loading, setLoading] = useState({
+    expenses: true,
+    balance: true,
+    detailed: true
+  });
+  
+  // Error states
+  const [errors, setErrors] = useState({
+    expenses: '',
+    balance: '', 
+    detailed: ''
+  });
 
-  // useEffect hook: Fetch all necessary data when component mounts or token changes
-  useEffect(() => {
-    // Ensure token exists before attempting fetches
+  // Payment modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTargetUser, setModalTargetUser] = useState(null);
+  const [modalBalanceDirection, setModalBalanceDirection] = useState(null);
+  const [modalError, setModalError] = useState('');
+
+  // Fetch data function
+  const fetchData = useCallback(async () => {
     if (!token) {
-      setErrorExpenses("Not authenticated");
-      setErrorBalance("Not authenticated");
-      setErrorDetailed("Not authenticated"); // Set detailed error too
-      setLoadingExpenses(false);
-      setLoadingBalance(false);
-      setLoadingDetailed(false); // Set detailed loading false
+      setErrors({
+        expenses: "Not authenticated",
+        balance: "Not authenticated",
+        detailed: "Not authenticated"
+      });
+      setLoading({
+        expenses: false,
+        balance: false,
+        detailed: false
+      });
       return;
     }
 
-    // --- Combined Fetching Function ---
-    const fetchData = async () => {
-      // Set all loading states to true, clear previous errors
-      setLoadingExpenses(true); setLoadingBalance(true); setLoadingDetailed(true);
-      setErrorExpenses(''); setErrorBalance(''); setErrorDetailed('');
+    try {
+      // Set loading states
+      setLoading({
+        expenses: true,
+        balance: true,
+        detailed: true
+      });
+      setErrors({
+        expenses: '',
+        balance: '',
+        detailed: ''
+      });
 
-      try {
-        // Use Promise.all to fetch all required data concurrently
-        const [expensesResponse, balanceResponse, detailedResponse] = await Promise.all([
-          fetch('http://localhost:3001/api/expenses', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('http://localhost:3001/api/balance/overall', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('http://localhost:3001/api/balance/detailed', { headers: { 'Authorization': `Bearer ${token}` } }) // <-- Fetch detailed balances
-        ]);
+      // Fetch all data
+      const [expensesResponse, balanceResponse, detailedResponse] = await Promise.all([
+        fetch('http://localhost:3001/api/expenses', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('http://localhost:3001/api/balance/overall', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('http://localhost:3001/api/balance/detailed', { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
 
-        // --- Process Expenses Response ---
-        if (!expensesResponse.ok) {
-          const errorData = await expensesResponse.json().catch(() => ({ message: 'Failed to parse expenses error' }));
-          throw new Error(`Expenses Error: ${errorData.message || `HTTP ${expensesResponse.status}`}`);
-        }
-        const expensesData = await expensesResponse.json();
-        console.log("Fetched expenses data:", expensesData);
-        setExpenses(expensesData);
+      // Handle responses
+      if (!expensesResponse.ok) throw new Error(`Expenses Error: ${await expensesResponse.text()}`);
+      if (!balanceResponse.ok) throw new Error(`Balance Error: ${await balanceResponse.text()}`);
+      if (!detailedResponse.ok) throw new Error(`Detailed Balance Error: ${await detailedResponse.text()}`);
 
-        // --- Process Overall Balance Response ---
-        if (!balanceResponse.ok) {
-          const errorData = await balanceResponse.json().catch(() => ({ message: 'Failed to parse overall balance error' }));
-          throw new Error(`Overall Balance Error: ${errorData.message || `HTTP ${balanceResponse.status}`}`);
-        }
-        const balanceData = await balanceResponse.json();
-        console.log("Fetched overall balance data:", balanceData);
-        setBalance(balanceData);
+      const [expensesData, balanceData, detailedData] = await Promise.all([
+        expensesResponse.json(),
+        balanceResponse.json(),
+        detailedResponse.json()
+      ]);
 
-        // --- Process Detailed Balance Response --- // <-- NEW PROCESSING
-        if (!detailedResponse.ok) {
-            const errorData = await detailedResponse.json().catch(() => ({ message: 'Failed to parse detailed balance error' }));
-            throw new Error(`Detailed Balance Error: ${errorData.message || `HTTP ${detailedResponse.status}`}`);
-        }
-        const detailedData = await detailedResponse.json(); // Expecting array: [{ userId, username, balance }]
-        console.log("Fetched detailed balances:", detailedData);
-        setDetailedBalances(detailedData); // <-- Update detailed balance state
-        // --- End New Processing ---
+      // Update states
+      setExpenses(expensesData);
+      setBalance(balanceData);
+      setDetailedBalances(detailedData);
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      setErrors({
+        expenses: err.message.includes('Expenses') ? err.message : 'Failed to load expenses',
+        balance: err.message.includes('Balance') ? err.message : 'Failed to load balance',
+        detailed: err.message.includes('Detailed') ? err.message : 'Failed to load detailed balances'
+      });
+    } finally {
+      setLoading({
+        expenses: false,
+        balance: false,
+        detailed: false
+      });
+    }
+  }, [token]);
 
-      } catch (err) {
-        console.error("Error fetching data:", err);
-        // Set specific or general errors based on error message content
-        if (err.message.includes('Expenses Error')) setErrorExpenses(err.message);
-        else if (err.message.includes('Overall Balance Error')) setErrorBalance(err.message);
-        else if (err.message.includes('Detailed Balance Error')) setErrorDetailed(err.message); // <-- Set detailed error
-        else {
-          // Set general error if origin unknown
-          setErrorExpenses('Failed to load some data.');
-          setErrorBalance('Failed to load some data.');
-          setErrorDetailed('Failed to load some data.'); // <-- Set general detailed error
-        }
-      } finally {
-        // Ensure all loading states are set to false after fetches complete/fail
-        setLoadingExpenses(false); setLoadingBalance(false); setLoadingDetailed(false);
+  // Initial data fetch
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Payment modal handlers
+  const handleOpenPaymentModal = (user, direction) => {
+    setModalTargetUser(user);
+    setModalBalanceDirection(direction);
+    setModalOpen(true);
+    setModalError('');
+  };
+
+  const handleClosePaymentModal = () => {
+    setModalOpen(false);
+    setModalTargetUser(null);
+    setModalBalanceDirection(null);
+    setModalError('');
+  };
+
+  const handleSubmitPayment = async (amount) => {
+    try {
+      setModalError('');
+      
+      const payerId = modalBalanceDirection === 'owesYou' ? modalTargetUser.userId : user.id;
+      const payeeId = modalBalanceDirection === 'owesYou' ? user.id : modalTargetUser.userId;
+
+      const response = await fetch('http://localhost:3001/api/payments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          payeeId,
+          amount,
+          payerId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
       }
-    };
 
-    fetchData(); // Execute the combined fetch function
+      // Refresh data and close modal
+      await fetchData();
+      handleClosePaymentModal();
+      alert('Payment recorded successfully!');
+    } catch (error) {
+      console.error('Payment error:', error);
+      setModalError(error.message || 'Failed to record payment');
+    }
+  };
 
-  }, [token]); // Dependency array: re-run effect if token changes
-
-
-  // --- Helper Function to Render Overall Balance Summary (no changes needed) ---
+  // Render functions
   const renderBalanceSummary = () => {
-    if (loadingBalance) return <p>Loading balance...</p>;
-    if (errorBalance) return <p style={{ color: 'orange' }}>Could not load balance: {errorBalance}</p>;
+    if (loading.balance) return <p>Loading balance...</p>;
+    if (errors.balance) return <p style={{ color: 'orange' }}>Could not load balance: {errors.balance}</p>;
+    
     const { netBalance } = balance;
     const balanceAmount = Math.abs(netBalance).toFixed(2);
-    if (Math.abs(netBalance) < 0.01) { return <p style={{ color: 'green', fontWeight: 'bold' }}>You are all settled up!</p>; }
-    else if (netBalance > 0) { return <p style={{ color: 'green', fontWeight: 'bold' }}>Overall, you are owed ${balanceAmount}</p>; }
-    else { return <p style={{ color: 'red', fontWeight: 'bold' }}>Overall, you owe ${balanceAmount}</p>; }
- };
+    
+    if (Math.abs(netBalance) < 0.01) {
+      return <p style={{ color: 'green', fontWeight: 'bold' }}>You are all settled up!</p>;
+    } else if (netBalance > 0) {
+      return <p style={{ color: 'green', fontWeight: 'bold' }}>Overall, you are owed ${balanceAmount}</p>;
+    } else {
+      return <p style={{ color: 'red', fontWeight: 'bold' }}>Overall, you owe ${balanceAmount}</p>;
+    }
+  };
 
-  // --- Render the component ---
   return (
     <div>
       <h1>Home Page</h1>
-      {/* Welcome message */}
       <h2>Welcome, {user?.username || 'User'}!</h2>
 
-      {/* Overall Balance Summary Section */}
+      {/* Balance Summary */}
       <div style={{ border: '1px solid grey', padding: '15px', margin: '20px 0', backgroundColor: 'black' }}>
         <h3>Overall Balance Summary:</h3>
         {renderBalanceSummary()}
-        { !loadingBalance && !errorBalance &&
+        {!loading.balance && !errors.balance && (
           <p style={{fontSize: '0.9em'}}>
-              (Total you paid: ${balance.totalPaid.toFixed(2)} | Total your share: ${balance.totalOwed.toFixed(2)})
+            (Total you paid: ${balance.totalPaid.toFixed(2)} | Total your share: ${balance.totalOwed.toFixed(2)})
           </p>
-        }
+        )}
       </div>
 
-      {/* --- NEW: Detailed Balance Section --- */}
+      {/* Detailed Balances */}
       <div style={{ margin: '20px 0' }}>
-          <h3>Who Owes Whom:</h3>
-          {/* Display loading state for detailed balances */}
-          {loadingDetailed && <p>Loading detailed balances...</p>}
-          {/* Display error state for detailed balances */}
-          {errorDetailed && <p style={{ color: 'red' }}>Error: {errorDetailed}</p>}
-          {/* Display message if no balances and not loading/error */}
-          {!loadingDetailed && !errorDetailed && detailedBalances.length === 0 && (
-              <p>No outstanding balances with anyone.</p>
-          )}
-          {/* Display the list of detailed balances */}
-          {!loadingDetailed && !errorDetailed && detailedBalances.length > 0 && (
-              <ul>
-                  {detailedBalances.map(item => (
-                      <li key={item.userId}>
-                          {/* Check if balance is positive (they owe you) or negative (you owe them) */}
-                          {item.balance > 0 ? (
-                              <span style={{ color: 'green' }}>
-                                  {item.username} owes you ${item.balance.toFixed(2)}
-                              </span>
-                          ) : (
-                              <span style={{ color: 'red' }}>
-                                  You owe {item.username} ${Math.abs(item.balance).toFixed(2)}
-                              </span>
-                          )}
-                      </li>
-                  ))}
-              </ul>
-          )}
+        <h3>Who Owes Whom:</h3>
+        {loading.detailed && <p>Loading detailed balances...</p>}
+        {errors.detailed && <p style={{ color: 'red' }}>Error: {errors.detailed}</p>}
+        {!loading.detailed && !errors.detailed && detailedBalances.length === 0 && (
+          <p>No outstanding balances with anyone.</p>
+        )}
+        {!loading.detailed && !errors.detailed && detailedBalances.length > 0 && (
+          <ul>
+            {detailedBalances.map(item => (
+              <li key={item.userId}>
+                {item.balance > 0 ? (
+                  <span style={{ color: 'green' }}>
+                    {item.username} owes you ${item.balance.toFixed(2)}
+                  </span>
+                ) : (
+                  <span style={{ color: 'red' }}>
+                    You owe {item.username} ${Math.abs(item.balance.toFixed(2))}
+                  </span>
+                )}
+                <button 
+                  style={{ marginLeft: '10px', fontSize: '0.8em' }}
+                  onClick={() => handleOpenPaymentModal(
+                    { userId: item.userId, username: item.username },
+                    item.balance > 0 ? 'owesYou' : 'youOwe'
+                  )}
+                >
+                  {item.balance > 0 ? 'Record Payment Received' : 'Record Payment Made'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-      {/* --- End Detailed Balance Section --- */}
 
-      {/* Add Expense Button/Link */}
+      {/* Payment Modal */}
+      {modalOpen && (
+        <RecordPaymentModal
+          isOpen={modalOpen}
+          onClose={handleClosePaymentModal}
+          onSubmit={handleSubmitPayment}
+          targetUser={modalTargetUser}
+          balanceDirection={modalBalanceDirection}
+          error={modalError}
+        />
+      )}
+
+      {/* Add Expense Button */}
       <div style={{ margin: '20px 0' }}>
         <Link to="/add-expense">
           <button>Add New Expense</button>
         </Link>
       </div>
 
-      {/* Your Expenses List Section */}
+      {/* Expenses List */}
       <h3>Your Expenses:</h3>
-      {/* Display loading/error/empty state for expenses */}
-      {loadingExpenses && <p>Loading expenses...</p>}
-      {!loadingExpenses && errorExpenses && <p style={{ color: 'red' }}>Error fetching expenses: {errorExpenses}</p>}
-      {!loadingExpenses && !errorExpenses && expenses.length === 0 && (
-         <p>You currently have no expenses recorded.</p>
+      {loading.expenses && <p>Loading expenses...</p>}
+      {!loading.expenses && errors.expenses && <p style={{ color: 'red' }}>Error fetching expenses: {errors.expenses}</p>}
+      {!loading.expenses && !errors.expenses && expenses.length === 0 && (
+        <p>You currently have no expenses recorded.</p>
       )}
-      {/* Display the list of expenses */}
-      {!loadingExpenses && !errorExpenses && expenses.length > 0 && (
-         <ul>
+      {!loading.expenses && !errors.expenses && expenses.length > 0 && (
+        <ul>
           {expenses.map((split) => (
             <li key={split.id} style={{ borderBottom: '1px solid #ccc', marginBottom: '10px', paddingBottom: '10px' }}>
               <strong>Description:</strong> {split.expense.description} <br />
@@ -191,7 +260,7 @@ function HomePage() {
               <strong>Your Share:</strong> ${split.amountOwed.toFixed(2)}
             </li>
           ))}
-         </ul>
+        </ul>
       )}
     </div>
   );

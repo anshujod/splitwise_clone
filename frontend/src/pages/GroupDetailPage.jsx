@@ -23,18 +23,19 @@ const GroupDetailPage = () => {
           return;
         }
 
+        const API_BASE = 'http://localhost:3001';
         const [detailsRes, expensesRes, balancesRes] = await Promise.all([
-          fetch(`/api/groups/${groupId}`, {
+          fetch(`${API_BASE}/api/groups/${groupId}`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
           }),
-          fetch(`/api/expenses?groupId=${groupId}`, {
+          fetch(`${API_BASE}/api/expenses?groupId=${groupId}`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
           }),
-          fetch(`/api/balance/detailed?groupId=${groupId}`, {
+          fetch(`${API_BASE}/api/balance/detailed?groupId=${groupId}`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -47,13 +48,17 @@ const GroupDetailPage = () => {
         }
 
         if (!expensesRes.ok) {
-          const data = await expensesRes.json();
-          throw new Error(`Expenses Error: ${data.message}`);
+          const text = await expensesRes.text();
+          throw new Error(text.includes('<!doctype') ?
+            'Server returned HTML error page' :
+            text || 'Failed to fetch expenses');
         }
 
         if (!balancesRes.ok) {
-          const data = await balancesRes.json();
-          throw new Error(`Balances Error: ${data.message}`);
+          const text = await balancesRes.text();
+          throw new Error(text.includes('<!doctype') ?
+            'Server returned HTML error page' :
+            text || 'Failed to fetch balances');
         }
 
         const [details, expenses, balances] = await Promise.all([
@@ -89,10 +94,48 @@ const GroupDetailPage = () => {
     return <div className="error">{error}</div>;
   }
 
+  // Calculate group balance summary
+  let groupTotalOwedByUser = 0;
+  let groupTotalOwedToUser = 0;
+  
+  if (groupBalances?.length > 0) {
+    groupBalances.forEach(balance => {
+      if (balance.balance < 0) {
+        groupTotalOwedByUser += Math.abs(balance.balance);
+      } else if (balance.balance > 0) {
+        groupTotalOwedToUser += balance.balance;
+      }
+    });
+  }
+
+  const netGroupBalance = groupTotalOwedToUser - groupTotalOwedByUser;
+
   return (
     <div className="group-detail">
       <h1>{groupDetails?.name}</h1>
       
+      <section className="balance-summary" style={{margin: '20px 0', padding: '15px', border: '1px solid #eee', borderRadius: '5px'}}>
+        <h2>Your Summary for this Group</h2>
+        <div>Total you are owed in this group: ${groupTotalOwedToUser.toFixed(2)}</div>
+        <div>Total you owe in this group: ${groupTotalOwedByUser.toFixed(2)}</div>
+        <div style={{
+          color: netGroupBalance > 0 ? 'green' : netGroupBalance < 0 ? 'red' : 'green',
+          fontWeight: 'bold',
+          marginTop: '10px'
+        }}>
+          {netGroupBalance > 0 ? `In this group, you are owed $${netGroupBalance.toFixed(2)} overall.` :
+           netGroupBalance < 0 ? `In this group, you owe $${Math.abs(netGroupBalance).toFixed(2)} overall.` :
+           'In this group, you are settled up.'}
+        </div>
+      </section>
+
+      <button
+        onClick={() => navigate('/add-expense', { state: { defaultGroupId: groupId } })}
+        style={{margin: '15px 0'}}
+      >
+        Add Expense to this Group
+      </button>
+
       <section className="balances">
         <h2>Balances</h2>
         {groupBalances.map(balance => (
