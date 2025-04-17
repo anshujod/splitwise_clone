@@ -1,0 +1,88 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") // Reads connection string from .env file
+}
+
+// ====================
+//       MODELS
+// ====================
+
+model User {
+  id        String   @id @default(cuid()) // Unique ID for the user
+  username  String   @unique              // User's chosen username, must be unique
+  email     String   @unique              // User's email, must be unique
+  password  String                        // Hashed password (NEVER store plain text)
+  createdAt DateTime @default(now())      // Timestamp when the user was created
+  updatedAt DateTime @updatedAt           // Timestamp when the user was last updated
+
+  // --- Relationships ---
+  groups       GroupMember[]            // User is a member of many groups (via GroupMember)
+  expensesPaid Expense[]     @relation("PaidBy") // Expenses paid by this user
+  splits       ExpenseSplit[]           // Splits this user is responsible for
+}
+
+model Group {
+  id          String   @id @default(cuid())
+  name        String                        // Name of the group (e.g., "Apartment", "Vacation")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // --- Relationships ---
+  members     GroupMember[]            // Members belonging to this group
+  expenses    Expense[]                // Expenses within this group
+}
+
+// Join table between User and Group
+model GroupMember {
+  id        String   @id @default(cuid())
+  joinedAt  DateTime @default(now())
+
+  // Foreign Keys & Relationships
+  groupId   String                      // Foreign key to Group
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade) // Link to Group
+
+  userId    String                      // Foreign key to User
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade) // Link to User
+
+  @@unique([groupId, userId])           // Ensure a user is only in a group once
+}
+
+model Expense {
+  id          String    @id @default(cuid())
+  description String                        // What the expense was for
+  amount      Float                         // Total amount of the expense
+  date        DateTime  @default(now())     // When the expense occurred (can be adjusted)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Foreign Keys & Relationships
+  groupId     String                        // Which group this expense belongs to
+  group       Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  paidById    String                        // Which user paid for this expense
+  paidBy      User      @relation("PaidBy", fields: [paidById], references: [id]) // Link to the User who paid
+
+  splits      ExpenseSplit[]                // How this expense is split
+}
+
+// Details how an Expense is split among users
+model ExpenseSplit {
+  id        String   @id @default(cuid())
+  amountOwed Float                       // How much this user owes for this split (can be 0)
+
+  // Foreign Keys & Relationships
+  expenseId String                      // Foreign key to Expense
+  expense   Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  userId    String                      // Foreign key to User who owes/is part of the split
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([expenseId, userId])           // Ensure a user has only one split entry per expense
+}
