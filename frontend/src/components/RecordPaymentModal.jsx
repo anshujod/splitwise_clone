@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 
-const RecordPaymentModal = ({ 
-  isOpen, 
-  onClose, 
-  onSubmit, 
-  targetUser, 
-  balanceDirection 
+const RecordPaymentModal = ({
+  isOpen,
+  onClose,
+  onSubmit,
+  targetUser,
+  balanceDirection,
+  currentBalance
 }) => {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,11 +54,15 @@ const RecordPaymentModal = ({
         <h3 style={{ color: '#333', marginBottom: '15px' }}>Record Payment</h3>
         
         <div style={{ marginBottom: '20px', color: '#555' }}>
-          {balanceDirection === 'owesYou' ? (
-            <p>{targetUser.username} owes you money. Enter the amount they paid you:</p>
-          ) : (
-            <p>You owe {targetUser.username} money. Enter the amount you're paying:</p>
+          <p>Record payment between You and {targetUser.username}</p>
+          {currentBalance && (
+            <p style={{ marginTop: '8px', fontSize: '0.9em' }}>
+              Current balance: {balanceDirection === 'owesYou'
+                ? `${targetUser.username} owes you $${currentBalance.toFixed(2)}`
+                : `You owe ${targetUser.username} $${currentBalance.toFixed(2)}`}
+            </p>
           )}
+          <p style={{ marginTop: '15px' }}>Enter payment amount:</p>
         </div>
 
         <form onSubmit={handleSubmit}>

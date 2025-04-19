@@ -230,6 +230,9 @@ function HomePage() {
           onSubmit={handleSubmitPayment}
           targetUser={modalTargetUser}
           balanceDirection={modalBalanceDirection}
+          currentBalance={Math.abs(
+            detailedBalances.find(b => b.userId === modalTargetUser.userId)?.balance || 0
+          )}
           error={modalError}
         />
       )}

@@ -20,7 +20,10 @@ function AddExpensePage() {
   const [loadingGroups, setLoadingGroups] = useState(true); // Loading state for groups dropdown
   const [loadingSubmit, setLoadingSubmit] = useState(false); // Loading state for form submission
   const [error, setError] = useState(''); // Combined error state for the page
+  const [splitMethod, setSplitMethod] = useState('equally'); // Split method
   const [splitAmounts, setSplitAmounts] = useState({}); // Track split amounts per member
+  const [splitPercentages, setSplitPercentages] = useState({}); // Track split percentages
+  const [splitShares, setSplitShares] = useState({}); // Track split shares
 
   // Get authentication token and logged-in user details from context
   const { token, user } = useAuth();
@@ -54,7 +57,7 @@ function AddExpensePage() {
         }));
         setUserGroups(groupsWithMembers);
         // Set default payer to logged-in user initially
-        if (user?.id && !payerId) { // Only set if payerId isn't already set (e.g., by group change effect)
+        if (user?.id && !payerId) {
             setPayerId(user.id);
         }
       } catch (err) {
@@ -65,78 +68,84 @@ function AddExpensePage() {
       }
     };
     fetchGroups();
-  }, [token, user?.id]); // Depend on token and user.id
+  }, [token, user?.id]);
 
   // Effect 2: Fetch/Set Members when Group Selection Changes
   useEffect(() => {
-    // Clear members and potentially reset payer if no group is selected
     if (!groupId) {
       setGroupMembers([]);
-      // Optionally reset payer to self, or leave it as is
-      // if (user?.id) setPayerId(user.id);
       return;
     }
 
-    setLoadingMembers(true); // Indicate loading members for the UI
+    setLoadingMembers(true);
     console.log(`Group selected: ${groupId}. Finding members...`);
 
-    // Find the full data for the selected group from the already fetched userGroups state
     const selectedGroupData = userGroups.find(g => g.id === groupId);
 
     if (selectedGroupData && selectedGroupData.members) {
-      // Handle both nested (member.user) and flat member structures
       const members = selectedGroupData.members.map(member => {
         if (member.user) {
-          return member.user; // Nested structure
+          return member.user;
         }
-        return { // Flat structure
+        return {
           id: member.userId || member.id,
           username: member.username || member.name
         };
-      }).filter(member => member.id && member.username); // Ensure valid members
+      }).filter(member => member.id && member.username);
       
       setGroupMembers(members);
       console.log('Members for selected group:', members);
 
-      // Check if the current payer is still valid for this group.
-      // If not, default to the logged-in user IF they are a member of this new group.
       const currentPayerIsValidMember = members.some(m => m.id === payerId);
       const loggedInUserIsMember = members.some(m => m.id === user?.id);
 
       if (!currentPayerIsValidMember && loggedInUserIsMember) {
           console.log("Current payer not in group, defaulting to logged-in user.");
           setPayerId(user.id);
-      } else if (!payerId && loggedInUserIsMember) { // Set default payer if payerId is empty
+      } else if (!payerId && loggedInUserIsMember) {
           console.log("No payer selected, defaulting to logged-in user.");
           setPayerId(user.id);
       }
     } else {
-      // This case means GET /api/groups didn't include members as expected
       console.warn("Member data not found in userGroups state for groupId:", groupId);
       setGroupMembers([]);
       setError("Could not load members for the selected group.");
     }
 
-    setLoadingMembers(false); // Finish loading members
+    setLoadingMembers(false);
+  }, [groupId, userGroups, user?.id]);
 
-  }, [groupId, userGroups, user?.id]); // Re-run when groupId or userGroups change
+  // Effect 3: Reset split states when method changes
+  useEffect(() => {
+    setSplitAmounts({});
+    setSplitPercentages({});
+    setSplitShares({});
+  }, [splitMethod]);
 
-
-  // Handle Form Submission (includes payerId)
   const handleSplitAmountChange = (memberId, value) => {
-    console.log(`Updating split for member ${memberId} to:`, value); // Debug log
-    // Allow empty string or valid numbers (potentially with decimals)
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
-      setSplitAmounts(prev => {
-        const newState = {
-          ...prev,
-          [memberId]: value
-        };
-        console.log('New splitAmounts state:', newState); // Debug log
-        return newState;
-      });
-    } else {
-      console.log('Invalid input rejected:', value); // Debug log
+      setSplitAmounts(prev => ({
+        ...prev,
+        [memberId]: value
+      }));
+    }
+  };
+
+  const handleSplitPercentageChange = (memberId, value) => {
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      setSplitPercentages(prev => ({
+        ...prev,
+        [memberId]: value
+      }));
+    }
+  };
+
+  const handleSplitSharesChange = (memberId, value) => {
+    if (value === '' || /^\d*$/.test(value)) {
+      setSplitShares(prev => ({
+        ...prev,
+        [memberId]: value
+      }));
     }
   };
 
@@ -144,7 +153,7 @@ function AddExpensePage() {
     event.preventDefault();
     setError('');
 
-    // Validation
+    // Basic validation
     if (!description.trim() || !amount || !groupId || !payerId) {
       setError('Please fill out all fields: Description, Amount, Group, and Paid By.');
       return;
@@ -155,55 +164,97 @@ function AddExpensePage() {
       return;
     }
 
-    // Validate splits sum matches expense amount
-    const sumOfSplits = Object.values(splitAmounts).reduce((sum, val) => {
-      const num = parseFloat(val);
-      return sum + (isNaN(num) ? 0 : num);
-    }, 0);
-    
-    if (Math.abs(sumOfSplits - numericAmount) >= 0.01) {
-      setError(`Split total (${sumOfSplits.toFixed(2)}) must equal the expense amount (${numericAmount.toFixed(2)})`);
-      return;
+    // Method-specific validation
+    let splitsPayload = [];
+    switch(splitMethod) {
+      case 'exact': {
+        const exactSum = Object.values(splitAmounts).reduce((sum, val) => {
+          const num = parseFloat(val);
+          return sum + (isNaN(num) ? 0 : num);
+        }, 0);
+        
+        if (Math.abs(exactSum - numericAmount) >= 0.01) {
+          setError(`Split total (${exactSum.toFixed(2)}) must equal the expense amount (${numericAmount.toFixed(2)})`);
+          return;
+        }
+        splitsPayload = groupMembers.map(member => ({
+          userId: member.id,
+          amountOwed: parseFloat(splitAmounts[member.id]) || 0
+        }));
+        break;
+      }
+
+      case 'percentage': {
+        const percentageSum = Object.values(splitPercentages).reduce((sum, val) => {
+          const num = parseFloat(val);
+          return sum + (isNaN(num) ? 0 : num);
+        }, 0);
+        
+        if (Math.abs(percentageSum - 100) >= 0.01) {
+          setError(`Sum of percentages (${percentageSum.toFixed(2)}%) must equal 100%`);
+          return;
+        }
+        splitsPayload = groupMembers.map(member => ({
+          userId: member.id,
+          percentage: parseFloat(splitPercentages[member.id]) || 0
+        }));
+        break;
+      }
+
+      case 'shares': {
+        const sharesSum = Object.values(splitShares).reduce((sum, val) => {
+          const num = parseFloat(val);
+          return sum + (isNaN(num) ? 0 : num);
+        }, 0);
+        
+        if (sharesSum <= 0) {
+          setError('Total shares must be greater than 0');
+          return;
+        }
+        splitsPayload = groupMembers.map(member => ({
+          userId: member.id,
+          shares: parseInt(splitShares[member.id]) || 0
+        }));
+        break;
+      }
+
+      case 'equally': {
+        const amountPerMember = numericAmount / groupMembers.length;
+        splitsPayload = groupMembers.map(member => ({
+          userId: member.id,
+          amountOwed: amountPerMember
+        }));
+        break;
+      }
+
+      default:
+        setError('Invalid split method selected');
+        return;
     }
 
-    // Prepare splits payload
-    const splitsPayload = groupMembers.map(member => ({
-      userId: member.id,
-      amountOwed: parseFloat(splitAmounts[member.id]) || 0
-    }));
-
-    setLoadingSubmit(true);
     try {
-      console.log('Submitting expense:', {
-        description,
-        amount: numericAmount,
-        groupId,
-        payerId,
-        splits: splitsPayload
-      });
-      // Prepare splits array from splitAmounts
-      const splits = Object.entries(splitAmounts)
-        .filter(([, amount]) => amount && !isNaN(parseFloat(amount)))
-        .map(([userId, amount]) => ({
-          userId,
-          amountOwed: parseFloat(amount)
-        }));
-
+      setLoadingSubmit(true);
       const response = await fetch('http://localhost:3001/api/expenses', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-              description: description.trim(),
-              amount: numericAmount,
-              groupId,
-              payerId,
-              splits
-          }),
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          description: description.trim(),
+          amount: numericAmount,
+          groupId,
+          payerId,
+          splits: splitsPayload,
+          splitMethod
+        }),
       });
       const data = await response.json();
-      if (!response.ok) { throw new Error(data.message || `HTTP Error ${response.status}`); }
+      if (!response.ok) {
+        throw new Error(data.message || `HTTP Error ${response.status}`);
+      }
       alert('Expense added successfully!');
-      navigate('/'); // Go back to home page
+      navigate('/');
     } catch (err) {
       console.error("Error adding expense:", err);
       setError(err.message || 'Failed to add expense.');
@@ -212,7 +263,27 @@ function AddExpensePage() {
     }
   };
 
-  // Render JSX
+  // Calculate summary values
+  const calculateSplitSummary = () => {
+    if (splitMethod === 'exact') {
+      return Object.values(splitAmounts).reduce((sum, val) => {
+        const num = parseFloat(val);
+        return sum + (isNaN(num) ? 0 : num);
+      }, 0);
+    } else if (splitMethod === 'percentage') {
+      return Object.values(splitPercentages).reduce((sum, val) => {
+        const num = parseFloat(val);
+        return sum + (isNaN(num) ? 0 : num);
+      }, 0);
+    } else if (splitMethod === 'shares') {
+      return Object.values(splitShares).reduce((sum, val) => {
+        const num = parseFloat(val);
+        return sum + (isNaN(num) ? 0 : num);
+      }, 0);
+    }
+    return 0;
+  };
+
   return (
     <div>
       <h1>Add New Expense</h1>
@@ -235,7 +306,7 @@ function AddExpensePage() {
           <select
             id="group"
             value={groupId}
-            onChange={(e) => setGroupId(e.target.value)} // Set group ID state
+            onChange={(e) => setGroupId(e.target.value)}
             required
             disabled={loadingSubmit || loadingGroups || userGroups.length === 0}
           >
@@ -250,75 +321,89 @@ function AddExpensePage() {
           </select>
         </div>
 
-        {/* --- NEW: Payer Select Dropdown --- */}
+        {/* Payer Select Dropdown */}
         <div>
           <label htmlFor="payer">Paid By:</label>
           <select
               id="payer"
-              value={payerId} // Controlled by payerId state
-              onChange={(e) => setPayerId(e.target.value)} // Update payerId state
+              value={payerId}
+              onChange={(e) => setPayerId(e.target.value)}
               required
-              disabled={loadingSubmit || loadingMembers || !groupId || groupMembers.length === 0} // Disable logic
+              disabled={loadingSubmit || loadingMembers || !groupId || groupMembers.length === 0}
           >
               <option value="" disabled>
                   { !groupId ? '-- Select Group First --' : (loadingMembers ? 'Loading members...' : (groupMembers.length === 0 ? '-- No members --' : '-- Select Payer --')) }
               </option>
-              {/* Map over members of the *selected* group */}
               {!loadingMembers && groupMembers.map((member) => (
                   <option key={member.id} value={member.id}>
-                      {member.username} {member.id === user?.id ? '(You)' : ''} {/* Indicate self */}
+                      {member.username} {member.id === user?.id ? '(You)' : ''}
                   </option>
               ))}
           </select>
           {loadingMembers && <span style={{ marginLeft: '10px', fontSize: '0.9em' }}>Loading...</span>}
         </div>
-        {/* --- End Payer Select --- */}
 
-        {/* Split Amounts Section */}
+        {/* Split Method Selection */}
+        <div className="mb-4">
+          <label className="block font-bold mb-2">Split Method:</label>
+          <div className="flex space-x-4">
+            <label><input type="radio" name="splitMethod" value="equally" checked={splitMethod === 'equally'} onChange={(e) => setSplitMethod(e.target.value)} /> Equally</label>
+            <label><input type="radio" name="splitMethod" value="exact" checked={splitMethod === 'exact'} onChange={(e) => setSplitMethod(e.target.value)} /> By Exact Amounts</label>
+            <label><input type="radio" name="splitMethod" value="percentage" checked={splitMethod === 'percentage'} onChange={(e) => setSplitMethod(e.target.value)} /> By Percentage</label>
+            <label><input type="radio" name="splitMethod" value="shares" checked={splitMethod === 'shares'} onChange={(e) => setSplitMethod(e.target.value)} /> By Shares</label>
+          </div>
+        </div>
+
+        {/* Split Details Section */}
         {!loadingMembers && groupId && groupMembers.length > 0 && (
           <div style={{ margin: '20px 0' }}>
             <h3>Split Details</h3>
-            <button
-              type="button"
-              onClick={() => {
-                if (!amount) {
-                  setError('Please enter a total amount first');
-                  return;
-                }
-                if (!groupMembers.length) {
-                  setError('No group members found');
-                  return;
-                }
-                
-                const numericAmount = parseFloat(amount);
-                if (isNaN(numericAmount) || numericAmount <= 0) {
-                  setError('Please enter a valid positive amount');
-                  return;
-                }
 
-                const numberOfMembers = groupMembers.length;
-                const amountPerMember = Math.round((numericAmount / numberOfMembers) * 100) / 100;
-                const remainder = Math.round((numericAmount * 100) - (amountPerMember * 100 * numberOfMembers));
-                
-                const newSplits = {};
-                groupMembers.forEach((member, index) => {
-                  let memberAmount = amountPerMember;
-                  // Add remainder to first member
-                  if (index === 0 && remainder !== 0) {
-                    memberAmount = (amountPerMember * 100 + remainder) / 100;
+            {/* Equally Split Button */}
+            {splitMethod === 'equally' && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!amount) {
+                    setError('Please enter a total amount first');
+                    return;
                   }
-                  newSplits[member.id] = memberAmount.toFixed(2);
-                });
+                  if (!groupMembers.length) {
+                    setError('No group members found');
+                    return;
+                  }
+                  
+                  const numericAmount = parseFloat(amount);
+                  if (isNaN(numericAmount) || numericAmount <= 0) {
+                    setError('Please enter a valid positive amount');
+                    return;
+                  }
 
-                setSplitAmounts(newSplits);
-                setError('');
-              }}
-              disabled={loadingSubmit || loadingMembers || !amount}
-              style={{ marginBottom: '15px' }}
-            >
-              Split Equally
-            </button>
-            {groupMembers.map(member => (
+                  const numberOfMembers = groupMembers.length;
+                  const amountPerMember = Math.round((numericAmount / numberOfMembers) * 100) / 100;
+                  const remainder = Math.round((numericAmount * 100) - (amountPerMember * 100 * numberOfMembers));
+                  
+                  const newSplits = {};
+                  groupMembers.forEach((member, index) => {
+                    let memberAmount = amountPerMember;
+                    if (index === 0 && remainder !== 0) {
+                      memberAmount = (amountPerMember * 100 + remainder) / 100;
+                    }
+                    newSplits[member.id] = memberAmount.toFixed(2);
+                  });
+
+                  setSplitAmounts(newSplits);
+                  setError('');
+                }}
+                disabled={loadingSubmit || loadingMembers || !amount}
+                style={{ marginBottom: '15px' }}
+              >
+                Split Equally
+              </button>
+            )}
+
+            {/* Exact Amount Inputs */}
+            {splitMethod === 'exact' && groupMembers.map(member => (
               <div key={member.id} style={{ margin: '10px 0' }}>
                 <label>
                   {member.username} {member.id === user?.id ? '(You)' : ''}:
@@ -335,27 +420,61 @@ function AddExpensePage() {
               </div>
             ))}
 
+            {/* Percentage Inputs */}
+            {splitMethod === 'percentage' && (
+              <>
+                <h4>Enter Percentages:</h4>
+                {groupMembers.map(member => (
+                  <div key={member.id} style={{ margin: '10px 0' }}>
+                    <label>
+                      {member.username} {member.id === user?.id ? '(You)' : ''}:
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={splitPercentages[member.id] || ''}
+                        onChange={(e) => handleSplitPercentageChange(member.id, e.target.value)}
+                        disabled={loadingSubmit}
+                        style={{ marginLeft: '10px' }}
+                      /> %
+                    </label>
+                  </div>
+                ))}
+              </>
+            )}
+
+            {/* Shares Inputs */}
+            {splitMethod === 'shares' && (
+              <>
+                <h4>Enter Shares:</h4>
+                {groupMembers.map(member => (
+                  <div key={member.id} style={{ margin: '10px 0' }}>
+                    <label>
+                      {member.username} {member.id === user?.id ? '(You)' : ''}:
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={splitShares[member.id] || ''}
+                        onChange={(e) => handleSplitSharesChange(member.id, e.target.value)}
+                        disabled={loadingSubmit}
+                        style={{ marginLeft: '10px' }}
+                      /> shares
+                    </label>
+                  </div>
+                ))}
+              </>
+            )}
+
             {/* Split Summary */}
             <div style={{ marginTop: '20px', padding: '10px', border: '1px solid #eee', borderRadius: '5px' }}>
               <div>Expense Total: ${amount || '0.00'}</div>
-              <div>Split Total: ${Object.values(splitAmounts).reduce((sum, val) => {
-                const num = parseFloat(val);
-                return sum + (isNaN(num) ? 0 : num);
-              }, 0).toFixed(2)}</div>
+              <div>Split Total: ${calculateSplitSummary().toFixed(2)}</div>
               <div style={{
-                color: Math.abs(parseFloat(amount || 0) - Object.values(splitAmounts).reduce((sum, val) => {
-                  const num = parseFloat(val);
-                  return sum + (isNaN(num) ? 0 : num);
-                }, 0)) <= 0.01 ? 'green' :
-                Object.values(splitAmounts).reduce((sum, val) => {
-                  const num = parseFloat(val);
-                  return sum + (isNaN(num) ? 0 : num);
-                }, 0) > parseFloat(amount || 0) ? 'red' : 'orange'
+                color: Math.abs(parseFloat(amount || 0) - calculateSplitSummary()) <= 0.01 ? 'green' :
+                calculateSplitSummary() > parseFloat(amount || 0) ? 'red' : 'orange'
               }}>
-                Amount Left: ${(parseFloat(amount || 0) - Object.values(splitAmounts).reduce((sum, val) => {
-                  const num = parseFloat(val);
-                  return sum + (isNaN(num) ? 0 : num);
-                }, 0)).toFixed(2)}
+                Amount Left: ${(parseFloat(amount || 0) - calculateSplitSummary()).toFixed(2)}
               </div>
             </div>
           </div>

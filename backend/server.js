@@ -294,13 +294,13 @@ app.get('/api/expenses', authenticateToken, async (req, res) => {
 // CREATE EXPENSE ROUTE
 app.post('/api/expenses', authenticateToken, async (req, res) => {
   const loggedInUserId = req.user.userId;
-  const { description, amount, groupId, splits } = req.body;
+  const { description, amount, groupId, payerId: requestedPayerId, splits, splitMethod = 'exact' } = req.body;
 
   console.log(`Attempting to add expense by user ${loggedInUserId} for group ${groupId}:`, req.body);
 
   // Input Validation
-  if (!description || !amount || !groupId || !splits) {
-    return res.status(400).json({ message: 'Missing required fields (description, amount, groupId, splits)' });
+  if (!description || !amount || !groupId) {
+    return res.status(400).json({ message: 'Missing required fields (description, amount, groupId)' });
   }
   
   const numericAmount = parseFloat(amount);
@@ -308,30 +308,68 @@ app.post('/api/expenses', authenticateToken, async (req, res) => {
     return res.status(400).json({ message: 'Invalid amount provided' });
   }
 
-  // Validate splits array
-  if (!splits) {
-    return res.status(400).json({ message: 'Splits array is required.' });
-  }
-  if (!Array.isArray(splits) || splits.length === 0) {
-    return res.status(400).json({ message: 'Splits must be a non-empty array' });
+  // Validate split method
+  const validSplitMethods = ['equally', 'exact', 'percentage', 'shares'];
+  if (!validSplitMethods.includes(splitMethod)) {
+    return res.status(400).json({ message: `Invalid splitMethod. Must be one of: ${validSplitMethods.join(', ')}` });
   }
 
-  // Validate each split
-  for (const split of splits) {
-    if (!split.userId || typeof split.amountOwed !== 'number') {
-      return res.status(400).json({ message: 'Each split must have userId and amountOwed' });
+  // Get group members for validation
+  const groupMembers = await prisma.groupMember.findMany({
+    where: { groupId },
+    select: { userId: true }
+  });
+  const memberIds = groupMembers.map(m => m.userId);
+
+  // Determine actual payer
+  let actualPayerId = loggedInUserId;
+  if (requestedPayerId && requestedPayerId !== loggedInUserId) {
+    if (!memberIds.includes(requestedPayerId)) {
+      return res.status(400).json({ message: 'Invalid payer specified' });
     }
-    if (split.amountOwed < 0) {
-      return res.status(400).json({ message: 'Split amounts must be non-negative' });
-    }
+    actualPayerId = requestedPayerId;
+    console.log(`Using specified payer ID: ${actualPayerId}`);
+  } else {
+    console.log(`Defaulting payer to logged-in user ID: ${actualPayerId}`);
   }
 
-  // Verify splits sum equals expense amount
-  const splitsSum = splits.reduce((sum, split) => sum + parseFloat(split.amountOwed), 0);
-  if (Math.abs(splitsSum - numericAmount) > 0.01) {
-    return res.status(400).json({
-      message: `Sum of splits ($${splitsSum.toFixed(2)}) does not match expense amount ($${numericAmount.toFixed(2)})`
-    });
+  // Validate splits based on method
+  if (splitMethod !== 'equally') {
+    if (!splits || !Array.isArray(splits) || splits.length === 0) {
+      return res.status(400).json({ message: 'Splits array is required for this split method' });
+    }
+
+    for (const split of splits) {
+      if (!split.userId || !memberIds.includes(split.userId)) {
+        return res.status(400).json({ message: `Invalid or non-member userId: ${split.userId}` });
+      }
+    }
+
+    if (splitMethod === 'exact') {
+      // Validate exact amounts
+      const splitsSum = splits.reduce((sum, split) => sum + parseFloat(split.amountOwed || 0), 0);
+      if (Math.abs(splitsSum - numericAmount) > 0.01) {
+        return res.status(400).json({
+          message: `Sum of splits ($${splitsSum.toFixed(2)}) does not match expense amount ($${numericAmount.toFixed(2)})`
+        });
+      }
+    } else if (splitMethod === 'percentage') {
+      // Validate percentages
+      const totalPercentage = splits.reduce((sum, split) => sum + parseFloat(split.percentage || 0), 0);
+      if (Math.abs(totalPercentage - 100) > 0.01) {
+        return res.status(400).json({
+          message: `Sum of percentages (${totalPercentage.toFixed(2)}%) must equal 100%`
+        });
+      }
+    } else if (splitMethod === 'shares') {
+      // Validate shares
+      const totalShares = splits.reduce((sum, split) => sum + parseFloat(split.shares || 0), 0);
+      if (totalShares <= 0) {
+        return res.status(400).json({
+          message: `Total shares must be greater than 0`
+        });
+      }
+    }
   }
 
   try {
@@ -352,20 +390,49 @@ app.post('/api/expenses', authenticateToken, async (req, res) => {
           description: description,
           amount: numericAmount,
           groupId: groupId,
-          paidById: loggedInUserId,
+          paidById: actualPayerId,
         }
       });
 
-      // 3. Create ExpenseSplit records from provided splits
+      // 3. Create ExpenseSplit records based on split method
+      let splitRecords = [];
+      
+      if (splitMethod === 'equally') {
+        // Calculate equal splits for all group members
+        const equalAmount = numericAmount / memberIds.length;
+        splitRecords = memberIds.map(userId => ({
+          expenseId: newExpense.id,
+          userId,
+          amountOwed: parseFloat(equalAmount.toFixed(2))
+        }));
+      } else if (splitMethod === 'exact') {
+        // Use provided exact amounts
+        splitRecords = splits.map(split => ({
+          expenseId: newExpense.id,
+          userId: split.userId,
+          amountOwed: parseFloat(split.amountOwed)
+        }));
+      } else if (splitMethod === 'percentage') {
+        // Calculate amounts from percentages
+        splitRecords = splits.map(split => ({
+          expenseId: newExpense.id,
+          userId: split.userId,
+          amountOwed: parseFloat((numericAmount * split.percentage / 100).toFixed(2))
+        }));
+      } else if (splitMethod === 'shares') {
+        // Calculate amounts from shares
+        const totalShares = splits.reduce((sum, split) => sum + parseFloat(split.shares), 0);
+        splitRecords = splits.map(split => ({
+          expenseId: newExpense.id,
+          userId: split.userId,
+          amountOwed: parseFloat((numericAmount * split.shares / totalShares).toFixed(2))
+        }));
+      }
+
+      // Create all split records
       await Promise.all(
-        splits.map(split =>
-          tx.expenseSplit.create({
-            data: {
-              expenseId: newExpense.id,
-              userId: split.userId,
-              amountOwed: parseFloat(split.amountOwed),
-            }
-          })
+        splitRecords.map(record =>
+          tx.expenseSplit.create({ data: record })
         )
       );
 
