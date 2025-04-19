@@ -30,7 +30,7 @@ const GroupDetailPage = () => {
               'Authorization': `Bearer ${token}`
             }
           }),
-          fetch(`${API_BASE}/api/expenses?groupId=${groupId}`, {
+          fetch(`${API_BASE}/api/groups/${groupId}/expenses`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }

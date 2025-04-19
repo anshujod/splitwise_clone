@@ -291,6 +291,47 @@ app.get('/api/expenses', authenticateToken, async (req, res) => {
   }
 });
 
+// GET GROUP EXPENSES ROUTE
+app.get('/api/groups/:groupId/expenses', authenticateToken, async (req, res) => {
+  const { groupId } = req.params;
+  const loggedInUserId = req.user.userId;
+
+  try {
+    // Verify user is a member of the group
+    const membership = await prisma.groupMember.findUnique({
+      where: {
+        groupId_userId: {
+          groupId: groupId,
+          userId: loggedInUserId
+        }
+      }
+    });
+
+    if (!membership) {
+      return res.status(403).json({ message: 'Not a member of this group' });
+    }
+
+    // Get all expenses for the group
+    const expenses = await prisma.expense.findMany({
+      where: { groupId },
+      include: {
+        paidBy: { select: { id: true, username: true } },
+        splits: {
+          include: {
+            user: { select: { id: true, username: true } }
+          }
+        }
+      },
+      orderBy: { date: 'desc' }
+    });
+
+    res.status(200).json(expenses);
+  } catch (error) {
+    console.error("Error fetching group expenses:", error);
+    res.status(500).json({ message: 'Error fetching group expenses' });
+  }
+});
+
 // CREATE EXPENSE ROUTE
 app.post('/api/expenses', authenticateToken, async (req, res) => {
   const loggedInUserId = req.user.userId;
@@ -452,8 +493,101 @@ app.post('/api/expenses', authenticateToken, async (req, res) => {
   }
 });
 
+// DELETE EXPENSE ROUTE
+app.delete('/api/expenses/:expenseId', authenticateToken, async (req, res, next) => {
+  const expenseId = req.params.expenseId;
+  const loggedInUserId = req.user.userId;
+
+  console.log(`Attempting to delete expense ${expenseId} by user ${loggedInUserId}`);
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      // 1. Find the expense and verify it exists
+      const expense = await tx.expense.findUniqueOrThrow({
+        where: { id: expenseId }
+      });
+
+      // 2. Check if logged-in user is the payer (only payer can delete)
+      if (expense.paidById !== loggedInUserId) {
+        console.log(`User ${loggedInUserId} not authorized to delete expense ${expenseId}`);
+        throw { status: 403, message: 'Only the payer can delete this expense' };
+      }
+
+      // 3. Delete all associated splits first (to avoid foreign key constraint)
+      await tx.expenseSplit.deleteMany({
+        where: { expenseId: expenseId }
+      });
+
+      // 4. Delete the expense itself
+      await tx.expense.delete({
+        where: { id: expenseId }
+      });
+
+      console.log(`Successfully deleted expense ${expenseId}`);
+    });
+
+    // Transaction completed successfully
+    res.status(204).end();
+  } catch (error) {
+    console.error("Error deleting expense:", error);
+    next(error); // Let the errorHandler middleware handle it
+  }
+});
+
 // ==========================================
 // GROUP ROUTES (PROTECTED)
+// UPDATE EXPENSE ROUTE (Basic - description/amount only)
+app.put('/api/expenses/:expenseId', authenticateToken, async (req, res, next) => {
+  const expenseId = req.params.expenseId;
+  const loggedInUserId = req.user.userId;
+  const { description, amount } = req.body;
+
+  console.log(`Attempting to update expense ${expenseId} by user ${loggedInUserId}`);
+
+  // Validate inputs
+  if (amount !== undefined) {
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({ message: 'Amount must be a positive number' });
+    }
+  }
+
+  try {
+    const updatedExpense = await prisma.$transaction(async (tx) => {
+      // 1. Find the expense and verify it exists
+      const expense = await tx.expense.findUniqueOrThrow({
+        where: { id: expenseId }
+      });
+
+      // 2. Check if logged-in user is the payer (only payer can edit)
+      if (expense.paidById !== loggedInUserId) {
+        console.log(`User ${loggedInUserId} not authorized to edit expense ${expenseId}`);
+        throw { status: 403, message: 'Only the payer can edit this expense' };
+      }
+
+      // 3. Update the expense (only description and amount for now)
+      const updateData = {};
+      if (description !== undefined) updateData.description = description;
+      if (amount !== undefined) updateData.amount = parseFloat(amount);
+
+      return await tx.expense.update({
+        where: { id: expenseId },
+        data: updateData,
+        include: {
+          paidBy: { select: { id: true, username: true } },
+          group: { select: { id: true, name: true } }
+        }
+      });
+    });
+
+    console.log(`Successfully updated expense ${expenseId}`);
+    res.status(200).json(updatedExpense);
+  } catch (error) {
+    console.error("Error updating expense:", error);
+    next(error); // Let the errorHandler middleware handle it
+  }
+});
+
 // ==========================================
 
 // GET USER'S GROUPS ROUTE
