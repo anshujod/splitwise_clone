@@ -12,6 +12,7 @@ function HomePage() {
   const [expenses, setExpenses] = useState([]);
   const [balance, setBalance] = useState({ totalPaid: 0, totalOwed: 0, netBalance: 0 });
   const [detailedBalances, setDetailedBalances] = useState([]);
+  const [deletingExpenses, setDeletingExpenses] = useState({}); // Track deleting state per expense
   
   // Loading states
   const [loading, setLoading] = useState({
@@ -32,6 +33,7 @@ function HomePage() {
   const [modalTargetUser, setModalTargetUser] = useState(null);
   const [modalBalanceDirection, setModalBalanceDirection] = useState(null);
   const [modalError, setModalError] = useState('');
+  const [processingPayment, setProcessingPayment] = useState(false);
 
   // Fetch data function
   const fetchData = useCallback(async () => {
@@ -85,7 +87,7 @@ function HomePage() {
       setBalance(balanceData);
       setDetailedBalances(detailedData);
     } catch (err) {
-      console.error("Error fetching data:", err);
+      // Log error to error reporting service in production
       setErrors({
         expenses: err.message.includes('Expenses') ? err.message : 'Failed to load expenses',
         balance: err.message.includes('Balance') ? err.message : 'Failed to load balance',
@@ -126,6 +128,7 @@ function HomePage() {
     }
 
     try {
+      setDeletingExpenses(prev => ({...prev, [expenseId]: true}));
       setErrors(prev => ({...prev, expenses: ''})); // Clear any existing errors
       
       const response = await fetch(`http://localhost:3001/api/expenses/${expenseId}`, {
@@ -143,13 +146,16 @@ function HomePage() {
         throw new Error(data.message || 'Failed to delete expense');
       }
     } catch (error) {
-      console.error('Delete expense error:', error);
+      // Log error to error reporting service in production
       toast.error(error.message || 'Failed to delete expense');
+    } finally {
+      setDeletingExpenses(prev => ({...prev, [expenseId]: false}));
     }
   };
 
   const handleSubmitPayment = async (amount) => {
     try {
+      setProcessingPayment(true);
       setModalError('');
       
       const payerId = modalBalanceDirection === 'owesYou' ? modalTargetUser.userId : user.id;
@@ -177,9 +183,11 @@ function HomePage() {
       handleClosePaymentModal();
       toast.success('Payment recorded successfully!');
     } catch (error) {
-      console.error('Payment error:', error);
+      // Log error to error reporting service in production
       setModalError(error.message || 'Failed to record payment');
       toast.error(error.message || 'Failed to record payment');
+    } finally {
+      setProcessingPayment(false);
     }
   };
 
@@ -264,6 +272,7 @@ function HomePage() {
             detailedBalances.find(b => b.userId === modalTargetUser.userId)?.balance || 0
           )}
           error={modalError}
+          processing={processingPayment}
         />
       )}
 
@@ -303,9 +312,20 @@ function HomePage() {
                     <div className="mt-2 space-x-2">
                       <button
                         onClick={() => handleDeleteExpense(split.expense.id)}
-                        className="text-xs text-red-600 hover:text-red-800 hover:underline"
+                        disabled={deletingExpenses[split.expense.id]}
+                        className={`text-xs text-red-600 hover:text-red-800 hover:underline flex items-center ${
+                          deletingExpenses[split.expense.id] ? 'opacity-70' : ''
+                        }`}
                       >
-                        Delete
+                        {deletingExpenses[split.expense.id] ? (
+                          <>
+                            <svg className="animate-spin mr-1 h-3 w-3 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Deleting...
+                          </>
+                        ) : 'Delete'}
                       </button>
                       <Link
                         to={`/edit-expense/${split.expense.id}`}

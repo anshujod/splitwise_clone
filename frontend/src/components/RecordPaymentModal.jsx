@@ -6,10 +6,10 @@ const RecordPaymentModal = ({
   onSubmit,
   targetUser,
   balanceDirection,
-  currentBalance
+  currentBalance,
+  processing
 }) => {
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
 
   if (!isOpen) return null;
@@ -25,7 +25,6 @@ const RecordPaymentModal = ({
       return;
     }
 
-    setIsSubmitting(true);
     onSubmit(amount);
   };
 
@@ -93,7 +92,7 @@ const RecordPaymentModal = ({
             <button 
               type="button" 
               onClick={onClose}
-              disabled={isSubmitting}
+              disabled={processing}
               style={{
                 padding: '8px 16px',
                 background: '#f1f1f1',
@@ -106,7 +105,7 @@ const RecordPaymentModal = ({
             </button>
             <button 
               type="submit" 
-              disabled={isSubmitting}
+              disabled={processing}
               style={{
                 padding: '8px 16px',
                 background: '#4CAF50',
@@ -116,7 +115,7 @@ const RecordPaymentModal = ({
                 cursor: 'pointer'
               }}
             >
-              {isSubmitting ? 'Processing...' : 'Submit Payment'}
+              {processing ? 'Processing...' : 'Submit Payment'}
             </button>
           </div>
         </form>

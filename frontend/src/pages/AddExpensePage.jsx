@@ -34,7 +34,6 @@ function AddExpensePage() {
   useEffect(() => {
     const fetchGroups = async () => {
       if (!token) {
-          console.log("AddExpensePage: No token, cannot fetch groups.");
           setLoadingGroups(false);
           return;
       }
@@ -49,7 +48,7 @@ function AddExpensePage() {
             throw new Error(e.message || `Failed to fetch groups (HTTP ${response.status})`);
         }
         const groupsData = await response.json();
-        console.log('Groups API response:', groupsData);
+        // Groups data loaded successfully
         
         // Ensure groups have members data
         const groupsWithMembers = groupsData.map(group => ({
@@ -79,7 +78,7 @@ function AddExpensePage() {
     }
 
     setLoadingMembers(true);
-    console.log(`Group selected: ${groupId}. Finding members...`);
+    // Group selected, finding members
 
     const selectedGroupData = userGroups.find(g => g.id === groupId);
 
@@ -95,16 +94,14 @@ function AddExpensePage() {
       }).filter(member => member.id && member.username);
       
       setGroupMembers(members);
-      console.log('Members for selected group:', members);
+      // Members loaded for selected group
 
       const currentPayerIsValidMember = members.some(m => m.id === payerId);
       const loggedInUserIsMember = members.some(m => m.id === user?.id);
 
       if (!currentPayerIsValidMember && loggedInUserIsMember) {
-          console.log("Current payer not in group, defaulting to logged-in user.");
           setPayerId(user.id);
       } else if (!payerId && loggedInUserIsMember) {
-          console.log("No payer selected, defaulting to logged-in user.");
           setPayerId(user.id);
       }
     } else {
@@ -342,7 +339,7 @@ function AddExpensePage() {
                   </option>
               ))}
           </select>
-          {loadingMembers && <span style={{ marginLeft: '10px', fontSize: '0.9em' }}>Loading...</span>}
+          {loadingMembers && <span className="ml-2.5 text-sm">Loading...</span>}
         </div>
 
         {/* Split Method Selection */}
@@ -358,7 +355,7 @@ function AddExpensePage() {
 
         {/* Split Details Section */}
         {!loadingMembers && groupId && groupMembers.length > 0 && (
-          <div style={{ margin: '20px 0' }}>
+          <div className="my-5">
             <h3>Split Details</h3>
 
             {/* Equally Split Button */}
@@ -435,13 +432,34 @@ function AddExpensePage() {
                         min="0"
                         step="0.1"
                         value={splitPercentages[member.id] || ''}
-                        onChange={(e) => handleSplitPercentageChange(member.id, e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                            const num = parseFloat(value);
+                            if (isNaN(num) || num <= 100) {
+                              handleSplitPercentageChange(member.id, value);
+                            }
+                          }
+                        }}
                         disabled={loadingSubmit}
-                        style={{ marginLeft: '10px' }}
+                        className="ml-2 px-2 py-1 border rounded w-20"
                       /> %
                     </label>
                   </div>
                 ))}
+                <div className="mt-4 p-2 border rounded" style={{
+                  backgroundColor: '#f8f9fa',
+                  borderColor: Math.abs(calculateSplitSummary() - 100) < 0.01 ? '#28a745' : '#dc3545'
+                }}>
+                  <p className={Math.abs(calculateSplitSummary() - 100) < 0.01 ? 'text-green-600' : 'text-red-600'}>
+                    Total Percentage: {calculateSplitSummary().toFixed(1)}%
+                  </p>
+                  {Math.abs(calculateSplitSummary() - 100) >= 0.01 && (
+                    <p className="text-red-600 text-sm mt-1">
+                      Percentages must sum to exactly 100%
+                    </p>
+                  )}
+                </div>
               </>
             )}
 
@@ -458,24 +476,42 @@ function AddExpensePage() {
                         min="0"
                         step="1"
                         value={splitShares[member.id] || ''}
-                        onChange={(e) => handleSplitSharesChange(member.id, e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '' || /^\d*$/.test(value)) {
+                            handleSplitSharesChange(member.id, value);
+                          }
+                        }}
                         disabled={loadingSubmit}
-                        style={{ marginLeft: '10px' }}
+                        className="ml-2 px-2 py-1 border rounded w-20"
                       /> shares
                     </label>
                   </div>
                 ))}
+                <div className="mt-4 p-2 border rounded" style={{
+                  backgroundColor: '#f8f9fa',
+                  borderColor: calculateSplitSummary() > 0 ? '#28a745' : '#dc3545'
+                }}>
+                  <p className={calculateSplitSummary() > 0 ? 'text-green-600' : 'text-red-600'}>
+                    Total Shares: {calculateSplitSummary()}
+                  </p>
+                  {calculateSplitSummary() <= 0 && (
+                    <p className="text-red-600 text-sm mt-1">
+                      Total shares must be greater than 0
+                    </p>
+                  )}
+                </div>
               </>
             )}
 
             {/* Split Summary */}
-            <div style={{ marginTop: '20px', padding: '10px', border: '1px solid #eee', borderRadius: '5px' }}>
+            <div className="mt-5 p-2.5 border border-gray-200 rounded">
               <div>Expense Total: ${amount || '0.00'}</div>
               <div>Split Total: ${calculateSplitSummary().toFixed(2)}</div>
-              <div style={{
-                color: Math.abs(parseFloat(amount || 0) - calculateSplitSummary()) <= 0.01 ? 'green' :
-                calculateSplitSummary() > parseFloat(amount || 0) ? 'red' : 'orange'
-              }}>
+              <div className={
+                Math.abs(parseFloat(amount || 0) - calculateSplitSummary()) <= 0.01 ? 'text-green-600' :
+                calculateSplitSummary() > parseFloat(amount || 0) ? 'text-red-600' : 'text-orange-500'
+              }>
                 Amount Left: ${(parseFloat(amount || 0) - calculateSplitSummary()).toFixed(2)}
               </div>
             </div>
