@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-// Optional: Import useNavigate from react-router-dom if you want to redirect after signup
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext'; // <-- Import useAuth
 
 function SignupPage() {
@@ -72,33 +71,111 @@ function SignupPage() {
   };
 
   return (
-    <div>
-      <h1>Sign Up</h1>
-      <form onSubmit={handleSubmit}>
-        {/* ... (input fields remain the same) ... */}
-         <div>
-          <label htmlFor="signup-username">Username:</label>
-          <input type="text" id="signup-username" name="username" required value={username} onChange={(e) => setUsername(e.target.value)} disabled={loading} />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-100">
+      <div className="w-full max-w-md px-6 py-8">
+        <div className="bg-white bg-opacity-90 backdrop-blur-sm rounded-xl shadow-xl overflow-hidden transition-all duration-300 hover:shadow-2xl">
+          <div className="px-10 py-12">
+            <div className="text-center mb-8">
+              <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 mb-2 animate-fade-in">
+                Splitsync
+              </h1>
+              <h2 className="text-2xl font-bold text-gray-800 mb-1 animate-bounce-in">Create Account</h2>
+              <p className="text-gray-600 animate-fade-in">Join us today</p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Username</label>
+                <input
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  type="text"
+                  id="signup-username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  disabled={loading}
+                  placeholder="Choose a username"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Email</label>
+                <input
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  type="email"
+                  id="signup-email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                  placeholder="your@email.com"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Password</label>
+                <input
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  type="password"
+                  id="signup-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Confirm Password</label>
+                <input
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  type="password"
+                  id="signup-confirm-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  disabled={loading}
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+
+              {error && (
+                <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className={`w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium rounded-lg shadow-md transition-all duration-300 flex items-center justify-center ${
+                  loading ? 'opacity-80' : ''
+                }`}
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing...
+                  </>
+                ) : (
+                  'Sign Up'
+                )}
+              </button>
+            </form>
+
+            <div className="mt-6 text-center text-sm text-gray-600">
+              Already have an account?{' '}
+              <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
+                Login
+              </Link>
+            </div>
+          </div>
         </div>
-        <div>
-          <label htmlFor="signup-email">Email:</label>
-          <input type="email" id="signup-email" name="email" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
-        </div>
-        <div>
-          <label htmlFor="signup-password">Password:</label>
-          <input type="password" id="signup-password" name="password" required value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
-        </div>
-        <div>
-           <label htmlFor="signup-confirm-password">Confirm Password:</label>
-           <input type="password" id="signup-confirm-password" name="confirmPassword" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} disabled={loading} />
-        </div>
-         {/* Display error message */}
-        {error && <p style={{ color: 'red' }}>{error}</p>}
-        <button type="submit" disabled={loading}>
-          {loading ? 'Signing Up...' : 'Sign Up'} {/* Show loading text */}
-        </button>
-      </form>
-      <p>Already have an account? <a href="/login">Login</a></p>
+      </div>
     </div>
   );
 }

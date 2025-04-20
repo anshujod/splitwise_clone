@@ -161,50 +161,51 @@ const GroupsPage = () => {
   }
 
   return (
-    <div className="groups-page">
-      <h1>Your Groups</h1>
+    <div className="p-4 max-w-4xl mx-auto">
+      <h1 className="text-3xl font-bold text-gray-800 mb-6">Your Groups</h1>
       
       {/* Group creation form */}
-      <div style={{ margin: '20px 0', padding: '15px', border: '1px solid #ddd', borderRadius: '5px' }}>
-        <h3>Create New Group</h3>
-        <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+      <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8">
+        <h3 className="text-xl font-semibold text-gray-800 mb-4">Create New Group</h3>
+        <div className="flex gap-3">
           <input
             type="text"
             value={newGroupName}
             onChange={(e) => setNewGroupName(e.target.value)}
             placeholder="Enter group name"
-            style={{ flex: 1, padding: '8px' }}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
           />
-          <button 
+          <button
             onClick={handleCreateGroup}
             disabled={creatingGroup}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded transition-colors disabled:opacity-50"
           >
             {creatingGroup ? 'Creating...' : 'Create Group'}
           </button>
         </div>
-        {createError && <p style={{ color: 'red', marginTop: '5px' }}>{createError}</p>}
+        {createError && <p className="text-red-500 text-sm mt-2">{createError}</p>}
       </div>
 
-      <div className="groups-list">
+      <div className="space-y-6">
         {groups.map(group => (
-          <div key={group.id} className="group-card" style={{ marginBottom: '20px', padding: '15px', border: '1px solid #eee' }}>
-            <Link to={`/groups/${group.id}`}>
-              <h3>{group.name}</h3>
+          <div key={group.id} className="bg-white p-6 rounded-lg shadow border border-gray-200">
+            <Link to={`/groups/${group.id}`} className="text-blue-600 hover:text-blue-800">
+              <h3 className="text-xl font-semibold mb-2">{group.name}</h3>
             </Link>
-            <p>Created: {new Date(group.createdAt).toLocaleDateString()}</p>
+            <p className="text-sm text-gray-500">Created: {new Date(group.createdAt).toLocaleDateString()}</p>
             
             {/* Member list */}
             {group.members.length > 0 && (
-              <div className="group-members" style={{ marginTop: '10px' }}>
-                <h4>Members:</h4>
-                <ul>
+              <div className="mt-4">
+                <h4 className="font-medium text-gray-700 mb-2">Members:</h4>
+                <ul className="space-y-1">
                   {group.members?.map(member => {
                     const username = member?.user?.username ||
                                    member?.username ||
                                    member?.name ||
                                    'Member';
                     return (
-                      <li key={member?.user?.id || member?.id || Math.random()}>
+                      <li key={member?.user?.id || member?.id || Math.random()} className="text-sm text-gray-600">
                         {username}
                       </li>
                     );
@@ -214,9 +215,9 @@ const GroupsPage = () => {
             )}
 
             {/* Add member form */}
-            <div style={{ marginTop: '15px' }}>
-              <h4>Add Member</h4>
-              <div style={{ display: 'flex', gap: '10px' }}>
+            <div className="mt-4">
+              <h4 className="font-medium text-gray-700 mb-2">Add Member</h4>
+              <div className="flex gap-2">
                 <input
                   type="email"
                   value={addMemberData.groupId === group.id ? addMemberData.email : ''}
@@ -227,17 +228,18 @@ const GroupsPage = () => {
                     error: ''
                   })}
                   placeholder="Member's email"
-                  style={{ flex: 1, padding: '8px' }}
+                  className="flex-1 px-3 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                 />
                 <button
                   onClick={() => handleAddMember(group.id)}
                   disabled={addMemberData.loading && addMemberData.groupId === group.id}
+                  className="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-sm rounded transition-colors disabled:opacity-50"
                 >
                   {addMemberData.loading && addMemberData.groupId === group.id ? 'Adding...' : 'Add'}
                 </button>
               </div>
               {addMemberData.groupId === group.id && addMemberData.error && (
-                <p style={{ color: 'red', marginTop: '5px' }}>{addMemberData.error}</p>
+                <p className="text-red-500 text-xs mt-1">{addMemberData.error}</p>
               )}
             </div>
           </div>

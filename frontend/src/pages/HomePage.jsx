@@ -155,60 +155,60 @@ function HomePage() {
 
   // Render functions
   const renderBalanceSummary = () => {
-    if (loading.balance) return <p>Loading balance...</p>;
-    if (errors.balance) return <p style={{ color: 'orange' }}>Could not load balance: {errors.balance}</p>;
+    if (loading.balance) return <p className="text-gray-600">Loading balance...</p>;
+    if (errors.balance) return <p className="text-orange-500">Could not load balance: {errors.balance}</p>;
     
     const { netBalance } = balance;
     const balanceAmount = Math.abs(netBalance).toFixed(2);
     
     if (Math.abs(netBalance) < 0.01) {
-      return <p style={{ color: 'green', fontWeight: 'bold' }}>You are all settled up!</p>;
+      return <p className="text-green-600 font-bold">You are all settled up!</p>;
     } else if (netBalance > 0) {
-      return <p style={{ color: 'green', fontWeight: 'bold' }}>Overall, you are owed ${balanceAmount}</p>;
+      return <p className="text-green-600 font-bold">Overall, you are owed ${balanceAmount}</p>;
     } else {
-      return <p style={{ color: 'red', fontWeight: 'bold' }}>Overall, you owe ${balanceAmount}</p>;
+      return <p className="text-red-600 font-bold">Overall, you owe ${balanceAmount}</p>;
     }
   };
 
   return (
-    <div>
-      <h1>Home Page</h1>
-      <h2>Welcome, {user?.username || 'User'}!</h2>
+    <div className="p-4 max-w-4xl mx-auto">
+      <h1 className="text-3xl font-bold text-gray-800 mb-4">Home Page</h1>
+      <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">Welcome, {user?.username || 'User'}!</h2>
 
       {/* Balance Summary */}
-      <div style={{ border: '1px solid grey', padding: '15px', margin: '20px 0', backgroundColor: 'black' }}>
-        <h3>Overall Balance Summary:</h3>
+      <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200 my-6">
+        <h3 className="text-xl font-semibold text-gray-800 mb-3">Overall Balance Summary</h3>
         {renderBalanceSummary()}
         {!loading.balance && !errors.balance && (
-          <p style={{fontSize: '0.9em'}}>
+          <p className="text-sm text-gray-600 mt-2">
             (Total you paid: ${balance.totalPaid.toFixed(2)} | Total your share: ${balance.totalOwed.toFixed(2)})
           </p>
         )}
       </div>
 
       {/* Detailed Balances */}
-      <div style={{ margin: '20px 0' }}>
-        <h3>Who Owes Whom:</h3>
-        {loading.detailed && <p>Loading detailed balances...</p>}
-        {errors.detailed && <p style={{ color: 'red' }}>Error: {errors.detailed}</p>}
+      <div className="my-6">
+        <h3 className="text-xl font-semibold text-gray-800 mb-3">Who Owes Whom</h3>
+        {loading.detailed && <p className="text-gray-600">Loading detailed balances...</p>}
+        {errors.detailed && <p className="text-red-500">Error: {errors.detailed}</p>}
         {!loading.detailed && !errors.detailed && detailedBalances.length === 0 && (
-          <p>No outstanding balances with anyone.</p>
+          <p className="text-gray-600">No outstanding balances with anyone.</p>
         )}
         {!loading.detailed && !errors.detailed && detailedBalances.length > 0 && (
-          <ul>
+          <ul className="space-y-2">
             {detailedBalances.map(item => (
-              <li key={item.userId}>
+              <li key={item.userId} className="bg-gray-50 p-3 rounded border border-gray-200 flex justify-between items-center">
                 {item.balance > 0 ? (
-                  <span style={{ color: 'green' }}>
+                  <span className="text-green-600 font-medium">
                     {item.username} owes you ${item.balance.toFixed(2)}
                   </span>
                 ) : (
-                  <span style={{ color: 'red' }}>
+                  <span className="text-red-600 font-medium">
                     You owe {item.username} ${Math.abs(item.balance.toFixed(2))}
                   </span>
                 )}
-                <button 
-                  style={{ marginLeft: '10px', fontSize: '0.8em' }}
+                <button
+                  className="bg-gray-200 hover:bg-gray-300 text-xs py-1 px-2 rounded transition-colors"
                   onClick={() => handleOpenPaymentModal(
                     { userId: item.userId, username: item.username },
                     item.balance > 0 ? 'owesYou' : 'youOwe'
@@ -238,29 +238,39 @@ function HomePage() {
       )}
 
       {/* Add Expense Button */}
-      <div style={{ margin: '20px 0' }}>
+      <div className="my-6">
         <Link to="/add-expense">
-          <button>Add New Expense</button>
+          <button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold py-2 px-4 rounded shadow-md transition-colors">
+            Add New Expense
+          </button>
         </Link>
       </div>
 
       {/* Expenses List */}
-      <h3>Your Expenses:</h3>
-      {loading.expenses && <p>Loading expenses...</p>}
-      {!loading.expenses && errors.expenses && <p style={{ color: 'red' }}>Error fetching expenses: {errors.expenses}</p>}
+      <h3 className="text-xl font-semibold text-gray-800 mb-3">Your Expenses</h3>
+      {loading.expenses && <p className="text-gray-600">Loading expenses...</p>}
+      {!loading.expenses && errors.expenses && <p className="text-red-500">Error fetching expenses: {errors.expenses}</p>}
       {!loading.expenses && !errors.expenses && expenses.length === 0 && (
-        <p>You currently have no expenses recorded.</p>
+        <p className="text-gray-600">You currently have no expenses recorded.</p>
       )}
       {!loading.expenses && !errors.expenses && expenses.length > 0 && (
-        <ul>
+        <ul className="space-y-4">
           {expenses.map((split) => (
-            <li key={split.id} style={{ borderBottom: '1px solid #ccc', marginBottom: '10px', paddingBottom: '10px' }}>
-              <strong>Description:</strong> {split.expense.description} <br />
-              <strong>Total Amount:</strong> ${split.expense.amount.toFixed(2)} <br />
-              <strong>Paid By:</strong> {split.expense.paidBy.username} <br />
-              <strong>Group:</strong> {split.expense.group.name} <br />
-              <strong>Date:</strong> {new Date(split.expense.date).toLocaleDateString()} <br />
-              <strong>Your Share:</strong> ${split.amountOwed.toFixed(2)}
+            <li key={split.id} className="bg-white p-4 rounded-lg shadow border border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div>
+                  <p className="font-medium text-gray-700">Description: {split.expense.description}</p>
+                  <p className="text-sm text-gray-500">Total: ${split.expense.amount.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Paid by: {split.expense.paidBy.username}</p>
+                  <p className="text-sm text-gray-500">Group: {split.expense.group.name}</p>
+                </div>
+                <div className="md:col-span-2">
+                  <p className="text-sm text-gray-500">Date: {new Date(split.expense.date).toLocaleDateString()}</p>
+                  <p className="text-sm text-gray-500 mt-1">Your share: ${split.amountOwed.toFixed(2)}</p>
+                </div>
+              </div>
             </li>
           ))}
         </ul>

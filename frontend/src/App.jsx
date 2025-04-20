@@ -1,5 +1,6 @@
 // frontend/src/App.jsx
 import React from 'react';
+import { Toaster } from '@/components/ui/sonner';
 // Import routing components
 import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 
@@ -31,42 +32,42 @@ function App() {
   };
 
   return (
-    <div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
       {/* Navigation Bar */}
-      <nav>
-        <ul>
-          <li><Link to="/">Home</Link></li>
+      <nav className="bg-white border-b border-gray-200 px-4 py-3">
+        <div className="max-w-6xl mx-auto">
+          <ul className="flex items-center space-x-6">
+            <li><Link to="/" className="text-gray-800 hover:text-blue-600 font-medium">Home</Link></li>
 
-           {/* --- ADDED: Link to Groups page when logged in --- */}
-           {isLoggedIn && (
-             <li>
-               <Link to="/groups">Groups</Link>
-             </li>
-           )}
-           {/* --- END ADDED LINK --- */}
-
-          {/* Conditionally show Login/Signup or Logout based on auth state */}
-          {isLoggedIn ? (
-            <>
+            {/* --- ADDED: Link to Groups page when logged in --- */}
+            {isLoggedIn && (
               <li>
-                {/* Logout Button - displays username */}
-                <button onClick={handleLogout}>
-                  Logout ({user?.username || 'User'})
-                </button>
+                <Link to="/groups" className="text-gray-800 hover:text-blue-600 font-medium">Groups</Link>
               </li>
-            </>
-          ) : (
-            <>
-              <li><Link to="/login">Login</Link></li>
-              <li><Link to="/signup">Sign Up</Link></li>
-            </>
-          )}
-        </ul>
+            )}
+            {/* --- END ADDED LINK --- */}
+
+            {/* Conditionally show Login/Signup or Logout based on auth state */}
+            {isLoggedIn ? (
+              <div className="ml-auto flex items-center space-x-4">
+                <span className="text-sm text-gray-600">Welcome, {user?.username || 'User'}</span>
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-1.5 text-sm text-red-700 bg-red-100 hover:bg-red-200 rounded-md font-medium transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <div className="ml-auto flex items-center space-x-4">
+                <li><Link to="/login" className="text-gray-800 hover:text-blue-600 font-medium">Login</Link></li>
+                <li><Link to="/signup" className="text-gray-800 hover:text-blue-600 font-medium">Sign Up</Link></li>
+              </div>
+            )}
+          </ul>
+        </div>
       </nav>
 
-      <hr /> {/* Visual separator */}
-
-      {/* Application Routes */}
       {/* Application Routes */}
       <Routes>
         {/* --- Protected Routes --- */}
