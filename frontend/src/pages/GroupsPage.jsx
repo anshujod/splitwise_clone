@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { toast } from 'sonner';
 
 const GroupsPage = () => {
   const { token } = useAuth();
@@ -97,9 +98,11 @@ const GroupsPage = () => {
 
       setNewGroupName('');
       fetchGroups();
+      toast.success('Group created successfully!');
     } catch (error) {
       console.error('Group creation error:', error);
       setCreateError(error.message || 'Failed to create group');
+      toast.error(error.message || 'Failed to create group.');
     } finally {
       setCreatingGroup(false);
     }
@@ -142,6 +145,7 @@ const GroupsPage = () => {
         error: ''
       });
       fetchGroups();
+      toast.success('Member added successfully!');
     } catch (error) {
       console.error('Add member error:', error);
       setAddMemberData(prev => ({
@@ -149,6 +153,7 @@ const GroupsPage = () => {
         loading: false,
         error: error.message || 'Failed to add member'
       }));
+      toast.error(error.message || 'Failed to add member.');
     }
   };
 

@@ -291,6 +291,51 @@ app.get('/api/expenses', authenticateToken, async (req, res) => {
   }
 });
 
+// GET SINGLE EXPENSE ROUTE
+app.get('/api/expenses/:expenseId', authenticateToken, async (req, res) => {
+  const { expenseId } = req.params;
+  const loggedInUserId = req.user.userId;
+
+  try {
+    // Find the expense with related data
+    const expense = await prisma.expense.findUnique({
+      where: { id: expenseId },
+      include: {
+        paidBy: { select: { id: true, username: true } },
+        group: {
+          select: {
+            id: true,
+            name: true,
+            members: {
+              select: { userId: true }
+            }
+          }
+        },
+        splits: {
+          include: {
+            user: { select: { id: true, username: true } }
+          }
+        }
+      }
+    });
+
+    if (!expense) {
+      return res.status(404).json({ message: 'Expense not found' });
+    }
+
+    // Check if user is a member of the expense's group
+    const isMember = expense.group.members.some(m => m.userId === loggedInUserId);
+    if (!isMember) {
+      return res.status(403).json({ message: 'Not authorized to view this expense' });
+    }
+
+    res.status(200).json(expense);
+  } catch (error) {
+    console.error("Error fetching expense:", error);
+    res.status(500).json({ message: 'Error fetching expense' });
+  }
+});
+
 // GET GROUP EXPENSES ROUTE
 app.get('/api/groups/:groupId/expenses', authenticateToken, async (req, res) => {
   const { groupId } = req.params;

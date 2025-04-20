@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import RecordPaymentModal from '../components/RecordPaymentModal';
+import { toast } from 'sonner';
 
 function HomePage() {
   // State management
@@ -119,6 +120,34 @@ function HomePage() {
     setModalError('');
   };
 
+  const handleDeleteExpense = async (expenseId) => {
+    if (!window.confirm('Are you sure you want to delete this expense? This action cannot be undone.')) {
+      return; // Stop if user cancels
+    }
+
+    try {
+      setErrors(prev => ({...prev, expenses: ''})); // Clear any existing errors
+      
+      const response = await fetch(`http://localhost:3001/api/expenses/${expenseId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.status === 204 || response.ok) {
+        toast.success('Expense deleted successfully!');
+        fetchData(); // Refresh the data
+      } else {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to delete expense');
+      }
+    } catch (error) {
+      console.error('Delete expense error:', error);
+      toast.error(error.message || 'Failed to delete expense');
+    }
+  };
+
   const handleSubmitPayment = async (amount) => {
     try {
       setModalError('');
@@ -146,10 +175,11 @@ function HomePage() {
       // Refresh data and close modal
       await fetchData();
       handleClosePaymentModal();
-      alert('Payment recorded successfully!');
+      toast.success('Payment recorded successfully!');
     } catch (error) {
       console.error('Payment error:', error);
       setModalError(error.message || 'Failed to record payment');
+      toast.error(error.message || 'Failed to record payment');
     }
   };
 
@@ -269,6 +299,22 @@ function HomePage() {
                 <div className="md:col-span-2">
                   <p className="text-sm text-gray-500">Date: {new Date(split.expense.date).toLocaleDateString()}</p>
                   <p className="text-sm text-gray-500 mt-1">Your share: ${split.amountOwed.toFixed(2)}</p>
+                  {split.expense.paidById === user?.id && (
+                    <div className="mt-2 space-x-2">
+                      <button
+                        onClick={() => handleDeleteExpense(split.expense.id)}
+                        className="text-xs text-red-600 hover:text-red-800 hover:underline"
+                      >
+                        Delete
+                      </button>
+                      <Link
+                        to={`/edit-expense/${split.expense.id}`}
+                        className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        Edit
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </div>
             </li>

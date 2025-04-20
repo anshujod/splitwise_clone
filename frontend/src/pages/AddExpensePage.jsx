@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { toast } from 'sonner';
 
 function AddExpensePage() {
   // Form input states
@@ -253,11 +254,12 @@ function AddExpensePage() {
       if (!response.ok) {
         throw new Error(data.message || `HTTP Error ${response.status}`);
       }
-      alert('Expense added successfully!');
+      toast.success('Expense added successfully!');
       navigate('/');
     } catch (err) {
       console.error("Error adding expense:", err);
       setError(err.message || 'Failed to add expense.');
+      toast.error(err.message || 'Failed to add expense.');
     } finally {
       setLoadingSubmit(false);
     }

@@ -1,6 +1,7 @@
 // frontend/src/App.jsx
 import React from 'react';
 import { Toaster } from '@/components/ui/sonner';
+import EditExpensePage from './pages/EditExpensePage';
 // Import routing components
 import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 
@@ -76,6 +77,11 @@ function App() {
           path="/"
           element={ <ProtectedRoute> <HomePage /> </ProtectedRoute> }
         />
+        {/* Edit Expense Page Route */}
+        <Route
+          path="/edit-expense/:expenseId"
+          element={ <ProtectedRoute> <EditExpensePage /> </ProtectedRoute> }
+        />
         {/* Add Expense Page Route */}
         <Route
           path="/add-expense"
@@ -112,6 +118,7 @@ function App() {
         {/* Example: <Route path="*" element={<div>404 Not Found</div>} /> */}
 
       </Routes>
+      <Toaster position="top-right" richColors />
     </div>
   );
 }
