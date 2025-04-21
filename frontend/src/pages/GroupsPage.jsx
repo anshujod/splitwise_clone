@@ -2,6 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Alert } from '@/components/ui/alert';
 
 const GroupsPage = () => {
   const { token } = useAuth();
@@ -173,22 +176,27 @@ const GroupsPage = () => {
       <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8">
         <h3 className="text-xl font-semibold text-gray-800 mb-4">Create New Group</h3>
         <div className="flex gap-3">
-          <input
-            type="text"
-            value={newGroupName}
-            onChange={(e) => setNewGroupName(e.target.value)}
-            placeholder="Enter group name"
-            className="flex-1 px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-          />
-          <button
+          <div className="flex-1 space-y-2">
+            <Input
+              type="text"
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              placeholder="Enter group name"
+            />
+            {createError && (
+              <Alert variant="destructive" className="p-2 text-sm">
+                {createError}
+              </Alert>
+            )}
+          </div>
+          <Button
             onClick={handleCreateGroup}
             disabled={creatingGroup}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded transition-colors disabled:opacity-50"
+            className="px-4 py-2"
           >
             {creatingGroup ? 'Creating...' : 'Create Group'}
-          </button>
+          </Button>
         </div>
-        {createError && <p className="text-red-500 text-sm mt-2">{createError}</p>}
       </div>
 
       <div className="space-y-6">

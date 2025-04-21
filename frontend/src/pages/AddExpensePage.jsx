@@ -3,6 +3,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Alert } from '@/components/ui/alert';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Loader2 } from 'lucide-react';
 
 function AddExpensePage() {
   // Form input states
@@ -284,73 +292,96 @@ function AddExpensePage() {
   };
 
   return (
-    <div>
-      <h1>Add New Expense</h1>
-      <form onSubmit={handleSubmit}>
+    <div className="flex justify-center pt-10">
+      <Card className="w-full max-w-lg mx-auto mt-8">
+        <CardHeader>
+          <CardTitle>Add New Expense</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
         {/* Description Input */}
-        <div>
-          <label htmlFor="description">Description:</label>
-          <input type="text" id="description" value={description} onChange={(e) => setDescription(e.target.value)} required disabled={loadingSubmit || loadingGroups}/>
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-gray-700 mb-1 block">Description</Label>
+          <Input
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            required
+            disabled={loadingSubmit || loadingGroups}
+          />
         </div>
 
         {/* Amount Input */}
-        <div>
-          <label htmlFor="amount">Amount ($):</label>
-          <input type="number" id="amount" value={amount} onChange={(e) => setAmount(e.target.value)} required min="0.01" step="0.01" disabled={loadingSubmit || loadingGroups}/>
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-gray-700 mb-1 block">Amount ($)</Label>
+          <Input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+            min="0.01"
+            step="0.01"
+            disabled={loadingSubmit || loadingGroups}
+          />
         </div>
 
         {/* Group Select Dropdown */}
-        <div>
-          <label htmlFor="group">Group:</label>
-          <select
-            id="group"
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-gray-700 mb-1 block">Group</Label>
+          <Select
             value={groupId}
-            onChange={(e) => setGroupId(e.target.value)}
-            required
+            onValueChange={setGroupId}
             disabled={loadingSubmit || loadingGroups || userGroups.length === 0}
           >
-            <option value="" disabled>
-              {loadingGroups ? 'Loading groups...' : (userGroups.length === 0 ? '-- No groups found --' : '-- Select a Group --')}
-            </option>
-            {!loadingGroups && userGroups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger>
+              <SelectValue placeholder={loadingGroups ? 'Loading groups...' : (userGroups.length === 0 ? '-- No groups found --' : '-- Select a Group --')} />
+            </SelectTrigger>
+            <SelectContent>
+              {!loadingGroups && userGroups.map((group) => (
+                <SelectItem key={group.id} value={group.id}>
+                  {group.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Payer Select Dropdown */}
-        <div>
-          <label htmlFor="payer">Paid By:</label>
-          <select
-              id="payer"
-              value={payerId}
-              onChange={(e) => setPayerId(e.target.value)}
-              required
-              disabled={loadingSubmit || loadingMembers || !groupId || groupMembers.length === 0}
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-gray-700 mb-1 block">Paid By</Label>
+          <Select
+            value={payerId}
+            onValueChange={setPayerId}
+            disabled={loadingSubmit || loadingMembers || !groupId || groupMembers.length === 0}
           >
-              <option value="" disabled>
-                  { !groupId ? '-- Select Group First --' : (loadingMembers ? 'Loading members...' : (groupMembers.length === 0 ? '-- No members --' : '-- Select Payer --')) }
-              </option>
+            <SelectTrigger>
+              <SelectValue placeholder={!groupId ? '-- Select Group First --' : (loadingMembers ? 'Loading members...' : (groupMembers.length === 0 ? '-- No members --' : '-- Select Payer --'))} />
+            </SelectTrigger>
+            <SelectContent>
               {!loadingMembers && groupMembers.map((member) => (
-                  <option key={member.id} value={member.id}>
-                      {member.username} {member.id === user?.id ? '(You)' : ''}
-                  </option>
+                <SelectItem key={member.id} value={member.id}>
+                  {member.username} {member.id === user?.id ? '(You)' : ''}
+                </SelectItem>
               ))}
-          </select>
-          {loadingMembers && <span className="ml-2.5 text-sm">Loading...</span>}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Split Method Selection */}
         <div className="mb-4">
-          <label className="block font-bold mb-2">Split Method:</label>
-          <div className="flex space-x-4">
-            <label><input type="radio" name="splitMethod" value="equally" checked={splitMethod === 'equally'} onChange={(e) => setSplitMethod(e.target.value)} /> Equally</label>
-            <label><input type="radio" name="splitMethod" value="exact" checked={splitMethod === 'exact'} onChange={(e) => setSplitMethod(e.target.value)} /> By Exact Amounts</label>
-            <label><input type="radio" name="splitMethod" value="percentage" checked={splitMethod === 'percentage'} onChange={(e) => setSplitMethod(e.target.value)} /> By Percentage</label>
-            <label><input type="radio" name="splitMethod" value="shares" checked={splitMethod === 'shares'} onChange={(e) => setSplitMethod(e.target.value)} /> By Shares</label>
-          </div>
+          <Label className="block font-bold text-gray-700 mb-2">Split Method</Label>
+          <RadioGroup value={splitMethod} onValueChange={setSplitMethod}>
+            <div className="flex space-x-4">
+              <RadioGroupItem value="equally" id="split-equally" />
+              <label htmlFor="split-equally">Equally</label>
+              <RadioGroupItem value="exact" id="split-exact" />
+              <label htmlFor="split-exact">By Exact Amounts</label>
+              <RadioGroupItem value="percentage" id="split-percentage" />
+              <label htmlFor="split-percentage">By Percentage</label>
+              <RadioGroupItem value="shares" id="split-shares" />
+              <label htmlFor="split-shares">By Shares</label>
+            </div>
+          </RadioGroup>
         </div>
 
         {/* Split Details Section */}
@@ -403,19 +434,24 @@ function AddExpensePage() {
 
             {/* Exact Amount Inputs */}
             {splitMethod === 'exact' && groupMembers.map(member => (
-              <div key={member.id} style={{ margin: '10px 0' }}>
-                <label>
-                  {member.username} {member.id === user?.id ? '(You)' : ''}:
-                  <input
+              <div key={member.id} className="flex items-center justify-between mb-2 space-x-2">
+                <Label htmlFor={`exact-${member.id}`} className="w-1/3 truncate">
+                  {member.username} {member.id === user?.id ? '(You)' : ''}
+                </Label>
+                <div className="w-2/3 flex items-center">
+                  <span className="mr-1 text-gray-500">$</span>
+                  <Input
+                    id={`exact-${member.id}`}
                     type="number"
                     min="0"
                     step="0.01"
+                    placeholder="0.00"
                     value={splitAmounts[member.id] || ''}
                     onChange={(e) => handleSplitAmountChange(member.id, e.target.value)}
                     disabled={loadingSubmit}
-                    style={{ marginLeft: '10px' }}
+                    className="h-8 text-right"
                   />
-                </label>
+                </div>
               </div>
             ))}
 
@@ -424,13 +460,17 @@ function AddExpensePage() {
               <>
                 <h4>Enter Percentages:</h4>
                 {groupMembers.map(member => (
-                  <div key={member.id} style={{ margin: '10px 0' }}>
-                    <label>
-                      {member.username} {member.id === user?.id ? '(You)' : ''}:
-                      <input
+                  <div key={member.id} className="flex items-center justify-between mb-2 space-x-2">
+                    <Label htmlFor={`percentage-${member.id}`} className="w-1/3 truncate">
+                      {member.username} {member.id === user?.id ? '(You)' : ''}
+                    </Label>
+                    <div className="w-2/3 flex items-center">
+                      <Input
+                        id={`percentage-${member.id}`}
                         type="number"
                         min="0"
                         step="0.1"
+                        placeholder="0.0"
                         value={splitPercentages[member.id] || ''}
                         onChange={(e) => {
                           const value = e.target.value;
@@ -442,9 +482,10 @@ function AddExpensePage() {
                           }
                         }}
                         disabled={loadingSubmit}
-                        className="ml-2 px-2 py-1 border rounded w-20"
-                      /> %
-                    </label>
+                        className="h-8 text-right"
+                      />
+                      <span className="ml-1 text-gray-500">%</span>
+                    </div>
                   </div>
                 ))}
                 <div className="mt-4 p-2 border rounded" style={{
@@ -468,13 +509,17 @@ function AddExpensePage() {
               <>
                 <h4>Enter Shares:</h4>
                 {groupMembers.map(member => (
-                  <div key={member.id} style={{ margin: '10px 0' }}>
-                    <label>
-                      {member.username} {member.id === user?.id ? '(You)' : ''}:
-                      <input
+                  <div key={member.id} className="flex items-center justify-between mb-2 space-x-2">
+                    <Label htmlFor={`shares-${member.id}`} className="w-1/3 truncate">
+                      {member.username} {member.id === user?.id ? '(You)' : ''}
+                    </Label>
+                    <div className="w-2/3 flex items-center">
+                      <Input
+                        id={`shares-${member.id}`}
                         type="number"
                         min="0"
                         step="1"
+                        placeholder="0"
                         value={splitShares[member.id] || ''}
                         onChange={(e) => {
                           const value = e.target.value;
@@ -483,9 +528,10 @@ function AddExpensePage() {
                           }
                         }}
                         disabled={loadingSubmit}
-                        className="ml-2 px-2 py-1 border rounded w-20"
-                      /> shares
-                    </label>
+                        className="h-8 text-right"
+                      />
+                      <span className="ml-1 text-gray-500">shares</span>
+                    </div>
                   </div>
                 ))}
                 <div className="mt-4 p-2 border rounded" style={{
@@ -519,19 +565,38 @@ function AddExpensePage() {
         )}
 
         {/* Error Display */}
-        {error && <p style={{ color: 'red' }}>{error}</p>}
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            {error}
+          </Alert>
+        )}
 
         {/* Submit/Cancel Buttons */}
-        <div style={{ marginTop: '20px' }}>
-          <button type="submit" disabled={loadingSubmit || loadingGroups || loadingMembers}>
-            {loadingSubmit ? 'Adding...' : 'Add Expense'}
-          </button>
-          <button type="button" onClick={() => navigate('/')} disabled={loadingSubmit || loadingGroups || loadingMembers} style={{ marginLeft: '10px' }}>
+        <div className="flex justify-end space-x-2 mt-6">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate('/')}
+            disabled={loadingSubmit || loadingGroups || loadingMembers}
+          >
             Cancel
-          </button>
+          </Button>
+          <Button
+            type="submit"
+            disabled={loadingSubmit || loadingGroups || loadingMembers}
+          >
+            {loadingSubmit ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Adding...
+              </>
+            ) : 'Add Expense'}
+          </Button>
         </div>
       </form>
-    </div>
+      </CardContent>
+    </Card>
+  </div>
   );
 }
 

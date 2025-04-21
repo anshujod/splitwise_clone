@@ -51,7 +51,7 @@ function App() {
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           {/* Left side - Brand/Logo */}
           <div className="flex items-center">
-            <Link to="/" className="text-xl font-bold text-blue-600">Splitwise</Link>
+            <Link to="/" className="text-xl font-bold text-blue-600">Splitsync</Link>
           </div>
 
           {/* Center - Desktop Navigation Links */}
