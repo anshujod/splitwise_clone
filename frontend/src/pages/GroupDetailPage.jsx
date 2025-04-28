@@ -28,7 +28,7 @@ const GroupDetailPage = () => {
       setLoading(true);
       setError('');
 
-      const API_BASE = 'http://localhost:3001'; // Updated to port 3001
+      const API_BASE = 'http://localhost:3001';
       const [groupRes, expensesRes] = await Promise.all([
         fetch(`${API_BASE}/api/groups/${groupId}`, {
           headers: {
@@ -75,6 +75,11 @@ const GroupDetailPage = () => {
     return <div className="error">{error}</div>;
   }
 
+  // Sort members alphabetically by name
+  const sortedMembers = [...(group?.members || [])].sort((a, b) => 
+    a.name?.localeCompare(b.name)
+  );
+
   return (
     <div className="p-4 max-w-4xl mx-auto">
       <Card className="mb-6">
@@ -84,16 +89,21 @@ const GroupDetailPage = () => {
         <CardContent>
           <div className="mb-4">
             <h3 className="font-semibold mb-2">Members</h3>
-            <div className="flex flex-wrap gap-2">
-              {group?.members.map(member => (
-                <div key={member.id} className="flex items-center gap-2">
-                  <Avatar>
-                    <AvatarImage src={member.avatar} />
-                    <AvatarFallback>
-                      {member.name?.charAt(0)?.toUpperCase()}
-                    </AvatarFallback>
+            <div className="flex flex-wrap gap-4">
+              {sortedMembers.map((member) => (
+                <div key={member.id} className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10 bg-gray-200">
+                    {member.avatar ? (
+                      <AvatarImage src={member.avatar} alt={member.name} />
+                    ) : (
+                      <AvatarFallback className="text-gray-800 font-medium">
+                        {member.name?.charAt(0)?.toUpperCase()}
+                      </AvatarFallback>
+                    )}
                   </Avatar>
-                  <span>{member.name}</span>
+                  <span className="text-sm font-medium">
+                    {member.name || member.username}
+                  </span>
                 </div>
               ))}
             </div>
