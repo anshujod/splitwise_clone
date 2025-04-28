@@ -190,6 +190,7 @@ const GroupsPage = () => {
               value={newGroupName}
               onChange={(e) => setNewGroupName(e.target.value)}
               placeholder="Enter group name"
+              className="border border-input bg-background px-3 py-2 h-10 text-sm rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             />
             {createError && (
               <Alert variant="destructive" className="p-2 text-sm">
@@ -226,13 +227,13 @@ const GroupsPage = () => {
                 <div>
                   <h4 className="font-medium text-gray-700 mb-2">Members:</h4>
                   <div className="flex flex-wrap gap-2">
-                    {group.members?.map(member => {
+                    {group.members?.map((member) => {
                       const username = member?.user?.username ||
                                      member?.username ||
                                      member?.name ||
                                      'Member';
                       const initials = username.split(' ').map(n => n[0]).join('').toUpperCase();
-                      
+                       
                       return (
                         <div key={member?.user?.id || member?.id || Math.random()} className="flex items-center gap-2">
                           <Avatar className="h-6 w-6 text-xs">
@@ -261,7 +262,7 @@ const GroupsPage = () => {
                       error: ''
                     })}
                     placeholder="Member's email"
-                    className="flex-1"
+                    className="border border-input bg-background px-3 py-2 h-10 text-sm rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 flex-1"
                   />
                   <Button
                     onClick={() => handleAddMember(group.id)}

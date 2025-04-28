@@ -308,6 +308,7 @@ function AddExpensePage() {
             onChange={(e) => setDescription(e.target.value)}
             required
             disabled={loadingSubmit || loadingGroups}
+            className="border border-input bg-background px-3 py-2 h-10 text-sm rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           />
         </div>
 
@@ -322,6 +323,7 @@ function AddExpensePage() {
             min="0.01"
             step="0.01"
             disabled={loadingSubmit || loadingGroups}
+            className="border border-input bg-background px-3 py-2 h-10 text-sm rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           />
         </div>
 
@@ -333,7 +335,7 @@ function AddExpensePage() {
             onValueChange={setGroupId}
             disabled={loadingSubmit || loadingGroups || userGroups.length === 0}
           >
-            <SelectTrigger>
+            <SelectTrigger className="border border-input bg-background px-3 py-2 h-10 text-sm rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
               <SelectValue placeholder={loadingGroups ? 'Loading groups...' : (userGroups.length === 0 ? '-- No groups found --' : '-- Select a Group --')} />
             </SelectTrigger>
             <SelectContent>
@@ -354,7 +356,7 @@ function AddExpensePage() {
             onValueChange={setPayerId}
             disabled={loadingSubmit || loadingMembers || !groupId || groupMembers.length === 0}
           >
-            <SelectTrigger>
+            <SelectTrigger className="border border-input bg-background px-3 py-2 h-10 text-sm rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
               <SelectValue placeholder={!groupId ? '-- Select Group First --' : (loadingMembers ? 'Loading members...' : (groupMembers.length === 0 ? '-- No members --' : '-- Select Payer --'))} />
             </SelectTrigger>
             <SelectContent>
@@ -449,7 +451,7 @@ function AddExpensePage() {
                     value={splitAmounts[member.id] || ''}
                     onChange={(e) => handleSplitAmountChange(member.id, e.target.value)}
                     disabled={loadingSubmit}
-                    className="h-8 text-right"
+                    className="border border-input bg-background px-3 py-2 h-8 text-sm rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-right"
                   />
                 </div>
               </div>
@@ -482,7 +484,7 @@ function AddExpensePage() {
                           }
                         }}
                         disabled={loadingSubmit}
-                        className="h-8 text-right"
+                        className="border border-input bg-background px-3 py-2 h-8 text-sm rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-right"
                       />
                       <span className="ml-1 text-gray-500">%</span>
                     </div>

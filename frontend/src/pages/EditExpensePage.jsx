@@ -108,7 +108,7 @@ function EditExpensePage() {
           id="description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-input bg-background px-3 py-2 h-10 text-sm rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           required
         />
       </div>
@@ -122,7 +122,7 @@ function EditExpensePage() {
           onChange={(e) => setAmount(e.target.value)}
           min="0.01"
           step="0.01"
-          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-input bg-background px-3 py-2 h-10 text-sm rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           required
         />
       </div>
@@ -134,7 +134,7 @@ function EditExpensePage() {
           type="text"
           value={groupId}
           disabled
-          className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100"
+          className="w-full border border-input bg-gray-100 px-3 py-2 h-10 text-sm rounded-md disabled:cursor-not-allowed disabled:opacity-50"
         />
       </div>
 
@@ -144,7 +144,7 @@ function EditExpensePage() {
           type="text"
           value={payerId}
           disabled
-          className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100"
+          className="w-full border border-input bg-gray-100 px-3 py-2 h-10 text-sm rounded-md disabled:cursor-not-allowed disabled:opacity-50"
         />
       </div>
 

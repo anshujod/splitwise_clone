@@ -80,6 +80,7 @@ function LoginPage() {
                           type="email"
                           placeholder="your@email.com"
                           disabled={loading}
+                          className="border border-input bg-background px-3 py-2 h-10 text-sm rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                           {...field}
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
@@ -100,6 +101,7 @@ function LoginPage() {
                           type="password"
                           placeholder="••••••••"
                           disabled={loading}
+                          className="border border-input bg-background px-3 py-2 h-10 text-sm rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                           {...field}
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
