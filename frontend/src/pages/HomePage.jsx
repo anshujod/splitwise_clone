@@ -3,6 +3,14 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import RecordPaymentModal from '../components/RecordPaymentModal';
 import { toast } from 'sonner';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell
+} from '../components/ui/table';
 
 function HomePage() {
   // State management
@@ -233,30 +241,42 @@ function HomePage() {
           <p className="text-gray-600">No outstanding balances with anyone.</p>
         )}
         {!loading.detailed && !errors.detailed && detailedBalances.length > 0 && (
-          <ul className="space-y-2">
-            {detailedBalances.map(item => (
-              <li key={item.userId} className="bg-gray-50 p-3 rounded border border-gray-200 flex justify-between items-center">
-                {item.balance > 0 ? (
-                  <span className="text-green-600 font-medium">
-                    {item.username} owes you ${item.balance.toFixed(2)}
-                  </span>
-                ) : (
-                  <span className="text-red-600 font-medium">
-                    You owe {item.username} ${Math.abs(item.balance.toFixed(2))}
-                  </span>
-                )}
-                <button
-                  className="bg-gray-200 hover:bg-gray-300 text-xs py-1 px-2 rounded transition-colors"
-                  onClick={() => handleOpenPaymentModal(
-                    { userId: item.userId, username: item.username },
-                    item.balance > 0 ? 'owesYou' : 'youOwe'
-                  )}
-                >
-                  {item.balance > 0 ? 'Record Payment Received' : 'Record Payment Made'}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {detailedBalances.map(item => (
+                  <TableRow key={item.userId}>
+                    <TableCell className="font-medium">{item.username}</TableCell>
+                    <TableCell>
+                      {item.balance > 0 ? 'Owes You' : 'You Owe'}
+                    </TableCell>
+                    <TableCell className={item.balance > 0 ? 'text-green-600' : 'text-red-600'}>
+                      ${Math.abs(item.balance).toFixed(2)}
+                    </TableCell>
+                    <TableCell>
+                      <button
+                        className="bg-gray-200 hover:bg-gray-300 text-xs py-1 px-2 rounded transition-colors"
+                        onClick={() => handleOpenPaymentModal(
+                          { userId: item.userId, username: item.username },
+                          item.balance > 0 ? 'owesYou' : 'youOwe'
+                        )}
+                      >
+                        {item.balance > 0 ? 'Record Payment' : 'Record Payment'}
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </div>
 
@@ -293,53 +313,62 @@ function HomePage() {
         <p className="text-gray-600">You currently have no expenses recorded.</p>
       )}
       {!loading.expenses && !errors.expenses && expenses.length > 0 && (
-        <ul className="space-y-4">
-          {expenses.map((split) => (
-            <li key={split.id} className="bg-white p-4 rounded-lg shadow border border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div>
-                  <p className="font-medium text-gray-700">Description: {split.expense.description}</p>
-                  <p className="text-sm text-gray-500">Total: ${split.expense.amount.toFixed(2)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Paid by: {split.expense.paidBy.username}</p>
-                  <p className="text-sm text-gray-500">Group: {split.expense.group.name}</p>
-                </div>
-                <div className="md:col-span-2">
-                  <p className="text-sm text-gray-500">Date: {new Date(split.expense.date).toLocaleDateString()}</p>
-                  <p className="text-sm text-gray-500 mt-1">Your share: ${split.amountOwed.toFixed(2)}</p>
-                  {split.expense.paidById === user?.id && (
-                    <div className="mt-2 space-x-2">
-                      <button
-                        onClick={() => handleDeleteExpense(split.expense.id)}
-                        disabled={deletingExpenses[split.expense.id]}
-                        className={`text-xs text-red-600 hover:text-red-800 hover:underline flex items-center ${
-                          deletingExpenses[split.expense.id] ? 'opacity-70' : ''
-                        }`}
-                      >
-                        {deletingExpenses[split.expense.id] ? (
-                          <>
-                            <svg className="animate-spin mr-1 h-3 w-3 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Deleting...
-                          </>
-                        ) : 'Delete'}
-                      </button>
-                      <Link
-                        to={`/edit-expense/${split.expense.id}`}
-                        className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
-                      >
-                        Edit
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Description</TableHead>
+                <TableHead>Group</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Paid By</TableHead>
+                <TableHead>Total Amount</TableHead>
+                <TableHead>Your Share</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {expenses.map((split) => (
+                <TableRow key={split.id}>
+                  <TableCell className="font-medium">{split.expense.description}</TableCell>
+                  <TableCell>{split.expense.group.name}</TableCell>
+                  <TableCell>{new Date(split.expense.date).toLocaleDateString()}</TableCell>
+                  <TableCell>{split.expense.paidBy.username}</TableCell>
+                  <TableCell>${split.expense.amount.toFixed(2)}</TableCell>
+                  <TableCell>${split.amountOwed.toFixed(2)}</TableCell>
+                  <TableCell>
+                    {split.expense.paidById === user?.id && (
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleDeleteExpense(split.expense.id)}
+                          disabled={deletingExpenses[split.expense.id]}
+                          className={`text-xs text-red-600 hover:text-red-800 hover:underline flex items-center ${
+                            deletingExpenses[split.expense.id] ? 'opacity-70' : ''
+                          }`}
+                        >
+                          {deletingExpenses[split.expense.id] ? (
+                            <>
+                              <svg className="animate-spin mr-1 h-3 w-3 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Deleting...
+                            </>
+                          ) : 'Delete'}
+                        </button>
+                        <Link
+                          to={`/edit-expense/${split.expense.id}`}
+                          className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          Edit
+                        </Link>
+                      </div>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </div>
   );

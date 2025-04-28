@@ -5,6 +5,14 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/alert';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardFooter
+} from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 const GroupsPage = () => {
   const { token } = useAuth();
@@ -199,63 +207,76 @@ const GroupsPage = () => {
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="grid gap-6 md:grid-cols-2">
         {groups.map(group => (
-          <div key={group.id} className="bg-white p-6 rounded-lg shadow border border-gray-200">
-            <Link to={`/groups/${group.id}`} className="text-blue-600 hover:text-blue-800">
-              <h3 className="text-xl font-semibold mb-2">{group.name}</h3>
-            </Link>
-            <p className="text-sm text-gray-500">Created: {new Date(group.createdAt).toLocaleDateString()}</p>
+          <Card key={group.id}>
+            <CardHeader>
+              <CardTitle>
+                <Link to={`/groups/${group.id}`} className="text-blue-600 hover:text-blue-800">
+                  {group.name}
+                </Link>
+              </CardTitle>
+            </CardHeader>
             
-            {/* Member list */}
-            {group.members.length > 0 && (
-              <div className="mt-4">
-                <h4 className="font-medium text-gray-700 mb-2">Members:</h4>
-                <ul className="space-y-1">
-                  {group.members?.map(member => {
-                    const username = member?.user?.username ||
-                                   member?.username ||
-                                   member?.name ||
-                                   'Member';
-                    return (
-                      <li key={member?.user?.id || member?.id || Math.random()} className="text-sm text-gray-600">
-                        {username}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
-
-            {/* Add member form */}
-            <div className="mt-4">
-              <h4 className="font-medium text-gray-700 mb-2">Add Member</h4>
-              <div className="flex gap-2">
-                <input
-                  type="email"
-                  value={addMemberData.groupId === group.id ? addMemberData.email : ''}
-                  onChange={(e) => setAddMemberData({
-                    groupId: group.id,
-                    email: e.target.value,
-                    loading: false,
-                    error: ''
-                  })}
-                  placeholder="Member's email"
-                  className="flex-1 px-3 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                />
-                <button
-                  onClick={() => handleAddMember(group.id)}
-                  disabled={addMemberData.loading && addMemberData.groupId === group.id}
-                  className="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-sm rounded transition-colors disabled:opacity-50"
-                >
-                  {addMemberData.loading && addMemberData.groupId === group.id ? 'Adding...' : 'Add'}
-                </button>
-              </div>
-              {addMemberData.groupId === group.id && addMemberData.error && (
-                <p className="text-red-500 text-xs mt-1">{addMemberData.error}</p>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-gray-500">Created: {new Date(group.createdAt).toLocaleDateString()}</p>
+              
+              {/* Member list */}
+              {group.members.length > 0 && (
+                <div>
+                  <h4 className="font-medium text-gray-700 mb-2">Members:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {group.members?.map(member => {
+                      const username = member?.user?.username ||
+                                     member?.username ||
+                                     member?.name ||
+                                     'Member';
+                      const initials = username.split(' ').map(n => n[0]).join('').toUpperCase();
+                      
+                      return (
+                        <div key={member?.user?.id || member?.id || Math.random()} className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6 text-xs">
+                            <AvatarFallback>{initials}</AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm text-gray-600">{username}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
-            </div>
-          </div>
+            </CardContent>
+
+            <CardFooter>
+              <div className="w-full space-y-2">
+                <h4 className="font-medium text-gray-700">Add Member</h4>
+                <div className="flex gap-2">
+                  <Input
+                    type="email"
+                    value={addMemberData.groupId === group.id ? addMemberData.email : ''}
+                    onChange={(e) => setAddMemberData({
+                      groupId: group.id,
+                      email: e.target.value,
+                      loading: false,
+                      error: ''
+                    })}
+                    placeholder="Member's email"
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={() => handleAddMember(group.id)}
+                    disabled={addMemberData.loading && addMemberData.groupId === group.id}
+                    size="sm"
+                  >
+                    {addMemberData.loading && addMemberData.groupId === group.id ? 'Adding...' : 'Add'}
+                  </Button>
+                </div>
+                {addMemberData.groupId === group.id && addMemberData.error && (
+                  <p className="text-red-500 text-xs">{addMemberData.error}</p>
+                )}
+              </div>
+            </CardFooter>
+          </Card>
         ))}
       </div>
     </div>

@@ -1,88 +1,69 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { toast } from 'sonner';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell
+} from '../components/ui/table';
+import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
+import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar';
 
 const GroupDetailPage = () => {
   const { groupId } = useParams();
   const { token } = useAuth();
   const navigate = useNavigate();
   
-  const [groupDetails, setGroupDetails] = useState(null);
-  const [groupExpenses, setGroupExpenses] = useState([]);
-  const [groupBalances, setGroupBalances] = useState([]);
+  const [group, setGroup] = useState(null);
+  const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const fetchGroupData = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        
-        if (!groupId || !token) {
-          return;
-        }
+  const fetchGroupData = async () => {
+    try {
+      setLoading(true);
+      setError('');
 
-        const API_BASE = 'http://localhost:3001';
-        const [detailsRes, expensesRes, balancesRes] = await Promise.all([
-          fetch(`${API_BASE}/api/groups/${groupId}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          }),
-          fetch(`${API_BASE}/api/groups/${groupId}/expenses`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          }),
-          fetch(`${API_BASE}/api/balance/detailed?groupId=${groupId}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          })
-        ]);
+      const API_BASE = 'http://localhost:3001'; // Updated to port 3001
+      const [groupRes, expensesRes] = await Promise.all([
+        fetch(`${API_BASE}/api/groups/${groupId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }),
+        fetch(`${API_BASE}/api/groups/${groupId}/expenses`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+      ]);
 
-        if (!detailsRes.ok) {
-          const data = await detailsRes.json();
-          throw new Error(`Group Details Error: ${data.message}`);
-        }
-
-        if (!expensesRes.ok) {
-          const text = await expensesRes.text();
-          throw new Error(text.includes('<!doctype') ?
-            'Server returned HTML error page' :
-            text || 'Failed to fetch expenses');
-        }
-
-        if (!balancesRes.ok) {
-          const text = await balancesRes.text();
-          throw new Error(text.includes('<!doctype') ?
-            'Server returned HTML error page' :
-            text || 'Failed to fetch balances');
-        }
-
-        const [details, expenses, balances] = await Promise.all([
-          detailsRes.json(),
-          expensesRes.json(),
-          balancesRes.json()
-        ]);
-
-        setGroupDetails(details);
-        setGroupExpenses(expenses);
-        setGroupBalances(balances);
-      } catch (err) {
-        console.error('Error fetching group data:', err);
-        if (err.message.includes('403') || err.message.includes('404')) {
-          setError('Group not found or you do not have access');
-          navigate('/groups');
-        } else {
-          setError(err.message || 'Failed to load group data');
-        }
-      } finally {
-        setLoading(false);
+      if (!groupRes.ok || !expensesRes.ok) {
+        throw new Error('Failed to fetch group data');
       }
-    };
 
+      const [groupData, expensesData] = await Promise.all([
+        groupRes.json(),
+        expensesRes.json()
+      ]);
+
+      setGroup(groupData);
+      setExpenses(expensesData);
+    } catch (err) {
+      console.error('Error fetching group data:', err);
+      setError('Failed to load group data');
+      toast.error('Failed to load group data');
+      navigate('/groups');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchGroupData();
   }, [groupId, token, navigate]);
 
@@ -94,73 +75,57 @@ const GroupDetailPage = () => {
     return <div className="error">{error}</div>;
   }
 
-  // Calculate group balance summary
-  let groupTotalOwedByUser = 0;
-  let groupTotalOwedToUser = 0;
-  
-  if (groupBalances?.length > 0) {
-    groupBalances.forEach(balance => {
-      if (balance.balance < 0) {
-        groupTotalOwedByUser += Math.abs(balance.balance);
-      } else if (balance.balance > 0) {
-        groupTotalOwedToUser += balance.balance;
-      }
-    });
-  }
-
-  const netGroupBalance = groupTotalOwedToUser - groupTotalOwedByUser;
-
   return (
-    <div className="group-detail">
-      <h1>{groupDetails?.name}</h1>
-      
-      <section className="balance-summary" style={{margin: '20px 0', padding: '15px', border: '1px solid #eee', borderRadius: '5px'}}>
-        <h2>Your Summary for this Group</h2>
-        <div>Total you are owed in this group: ${groupTotalOwedToUser.toFixed(2)}</div>
-        <div>Total you owe in this group: ${groupTotalOwedByUser.toFixed(2)}</div>
-        <div style={{
-          color: netGroupBalance > 0 ? 'green' : netGroupBalance < 0 ? 'red' : 'green',
-          fontWeight: 'bold',
-          marginTop: '10px'
-        }}>
-          {netGroupBalance > 0 ? `In this group, you are owed $${netGroupBalance.toFixed(2)} overall.` :
-           netGroupBalance < 0 ? `In this group, you owe $${Math.abs(netGroupBalance).toFixed(2)} overall.` :
-           'In this group, you are settled up.'}
-        </div>
-      </section>
-
-      <button
-        onClick={() => navigate('/add-expense', { state: { defaultGroupId: groupId } })}
-        style={{margin: '15px 0'}}
-      >
-        Add Expense to this Group
-      </button>
-
-      <section className="balances">
-        <h2>Balances</h2>
-        {groupBalances.map(balance => (
-          <div key={balance.userId}>
-            {balance.username}: ${balance.balance}
+    <div className="p-4 max-w-4xl mx-auto">
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>{group?.name} Group</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4">
+            <h3 className="font-semibold mb-2">Members</h3>
+            <div className="flex flex-wrap gap-2">
+              {group?.members.map(member => (
+                <div key={member.id} className="flex items-center gap-2">
+                  <Avatar>
+                    <AvatarImage src={member.avatar} />
+                    <AvatarFallback>
+                      {member.name?.charAt(0)?.toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span>{member.name}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
-      </section>
 
-      <section className="expenses">
-        <h2>Expenses</h2>
-        {groupExpenses.length > 0 ? (
-          <ul>
-            {groupExpenses.map(expense => (
-              <li key={expense.id}>
-                {expense.description} - ${expense.amount}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No expenses yet</p>
-        )}
-      </section>
-
-      <Link to="/groups">Back to Groups</Link>
+          <div className="mb-4">
+            <h3 className="font-semibold mb-2">Expenses</h3>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Paid by</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {expenses.map(expense => (
+                  <TableRow key={expense.id} onClick={() => navigate(`/expenses/${expense.id}`)}>
+                    <TableCell>{expense.description}</TableCell>
+                    <TableCell>${expense.amount.toFixed(2)}</TableCell>
+                    <TableCell>{expense.paidBy?.name}</TableCell>
+                    <TableCell>
+                      {new Date(expense.date).toLocaleDateString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
